@@ -30,10 +30,7 @@ pub static MODULES: OnceLock<AHashMap<String, SafeMODULEENTRY32>> = OnceLock::ne
 // Keys that should be used with loops in scripts. If a value is false, the loop should stop.
 pub static SCRIPTING_THREAD_KEYS: OnceLock<RwLock<AHashMap<String, bool>>> = OnceLock::new();
 
+/// Logged screen (and stdout) messages.
 pub static LOGGED_MESSAGES: OnceLock<Mutex<ZString>> = OnceLock::new();
-
-/// Legacy script parameters.
-#[cfg(target_pointer_width = "32")]
-pub static SSO_LEGACY_SCRIPT_PARMS: OnceLock<(i32, i32)> = OnceLock::new();
 
 public_static_mut!(DELTA_TIME, f32, 0.0, "Current Delta Time.");
