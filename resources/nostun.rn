@@ -1,0 +1,12 @@
+pub async fn main() {
+    dynamic::create_thread_key("nostun");
+    while dynamic::get_thread_key("nostun") {
+        PXScript::execute("if (global/GameUI/Window_HUD_GaitIndicator/View_Gaits/View_HorseStateStatusIcons/View_IconStunned.GetActionStarted())
+        {
+            global/Player.SetPlayerTPNetLockMovement(1);
+            global/GameUI/Window_HUD_GaitIndicator/View_Gaits/View_HorseStateStatusIcons/View_IconStunned.Stop();
+            global/Player.SetPlayerTPNetLockMovement(0);
+        }", false, true);
+        Task::sleep_ms(200).await;
+    }
+}

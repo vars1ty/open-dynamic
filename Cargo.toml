@@ -1,0 +1,41 @@
+cargo-features = ["edition2024"]
+
+[package]
+name = "dynamic"
+version = "6.0.0-release"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hudhook = { path = "/home/stackalloc/Git/hudhook", features = [ "dx9", "dx12", "dx11", "opengl3" ], default-features = false }
+windows = { version = "0.51.1", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Diagnostics_ToolHelp", "System", "Win32_System_LibraryLoader", "Win32_System_Console", "Win32_UI_Input_KeyboardAndMouse"] }
+retour = { git = "https://github.com/Hpmason/retour-rs.git", features = ["static-detour", "thiscall-abi"] }
+flate2 = { version = "1.0.30", features = ["zlib"], default-features = false }
+parking_lot = { version = "0.12.2", features = ["serde"] }
+smallvec = "1.13.1"
+indexmap = "2.2.5"
+ahash = "0.8.11"
+zstring = { path = "/home/stackalloc/Git/zstring" }
+wmem = { path = "/home/stackalloc/Git/wmem" }
+sbyt = { path = "/home/stackalloc/Git/sbyt" }
+crossbeam-channel = "0.5.13"
+serde_jsonc = "1.0.108"
+dll-syringe = "0.15.2"
+magic-crypt = "3.1.13"
+message-io = "0.18.1"
+serde = "1.0.204"
+obfstr = "0.4.3"
+image = "0.24.9"
+rkyv = "0.7.44"
+rune = "0.13.4"
+
+[profile.release]
+overflow-checks = true
+incremental = true
+codegen-units = 1
+panic = "abort"
+opt-level = "s"
+strip = true
+lto = "fat"
