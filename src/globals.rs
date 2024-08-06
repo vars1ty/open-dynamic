@@ -1,9 +1,8 @@
-use crate::utils::eguiutils::ImGuiUtils;
 use ahash::AHashMap;
 use parking_lot::{Mutex, RwLock};
-use zstring::ZString;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use windows::Win32::System::Diagnostics::ToolHelp::MODULEENTRY32;
+use zstring::ZString;
 
 /// Basic macro for generating a static mutable reference.
 macro_rules! public_static_mut {
@@ -20,9 +19,6 @@ macro_rules! public_static_mut {
 /// Safe wrapper around MODULEENTRY32.
 pub struct SafeMODULEENTRY32(pub MODULEENTRY32);
 thread_safe_structs!(SafeMODULEENTRY32);
-
-/// Global static `ImGuiUtils` instance.
-pub static IMGUI_UTILS: OnceLock<Arc<RwLock<ImGuiUtils>>> = OnceLock::new();
 
 /// Cached process modules.
 pub static MODULES: OnceLock<AHashMap<String, SafeMODULEENTRY32>> = OnceLock::new();

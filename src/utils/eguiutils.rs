@@ -1,12 +1,12 @@
 use super::crosscom::CrossCom;
 use crate::{
-    globals::{IMGUI_UTILS, LOGGED_MESSAGES},
+    globals::LOGGED_MESSAGES,
     utils::{colorutils::ColorUtils, config::Config, extensions::OptionExt},
     winutils::WinUtils,
 };
 use ahash::AHashMap;
 use hudhook::imgui::{self, internal::DataTypeKind, sys::*, *};
-use parking_lot::{RwLock, RwLockWriteGuard};
+use parking_lot::RwLock;
 use std::sync::Arc;
 use windows::Win32::Foundation::POINT;
 
@@ -27,23 +27,11 @@ pub struct ImGuiUtils {
 }
 
 impl ImGuiUtils {
-    pub unsafe fn init() {
-        let instance = Arc::new(RwLock::new(Self {
+    pub fn new() -> Self {
+        Self {
             enable_side_messages: true,
             fonts: AHashMap::new(),
-        }));
-
-        IMGUI_UTILS.get_or_init(|| instance);
-    }
-
-    /// Gets a static mutable reference of `Self`.
-    /// **No** safety for data-races, only intended for `add_screen_message` and `self.enable_side_messages`.
-    #[allow(unsafe_op_in_unsafe_fn)]
-    pub unsafe fn get_self_mut() -> RwLockWriteGuard<'static, ImGuiUtils> {
-        IMGUI_UTILS
-            .get()
-            .unwrap_or_crash(zencstr!("[ERROR] No globally cached ImGuiUtils instance!"))
-            .write()
+        }
     }
 
     /// Applies a custom font.
@@ -252,23 +240,17 @@ impl ImGuiUtils {
         Some(ui.push_font(font.id()))
     }
 
-    /// Tries to activate a custom-added font, which is being looked up by `relative_font_path`.
-    pub fn activate_custom_font(
-        ui: &imgui::Ui,
-        relative_font_path: Arc<String>,
-    ) -> Option<FontStackToken<'_>> {
-        let font_id = *unsafe {
-            Self::get_self_mut()
-                .fonts
-                .get(&relative_font_path)
-                .unwrap_or_crash(zencstr!(
-                    "[ERROR] No font has been instantiated with the relative path of \"",
-                    relative_font_path,
-                    "\"!"
-                ))
-        };
-
-        Self::activate_font(ui, font_id)
+    /// Tries to find the custom font by its relative path, returning the index to be used with
+    /// `Self::activate_font`.
+    pub fn get_cfont_from_rpath(&self, relative_font_path: Arc<String>) -> usize {
+        *self
+            .fonts
+            .get(&relative_font_path)
+            .unwrap_or_crash(zencstr!(
+                "[ERROR] No font has been instantiated with the relative path of \"",
+                relative_font_path,
+                "\"!"
+            ))
     }
 
     /// Draws the top-left screen messages.

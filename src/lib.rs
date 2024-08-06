@@ -20,12 +20,10 @@ mod ui;
 mod utils;
 mod winutils;
 
-//#[cfg(target_pointer_width = "32")]
-//use crate::utils::hooks::legacy_pxhooks::LegacyPXHooks;
 use crate::{
     mod_cores::base_core::BaseCore,
     ui::unknown::dx11_ui::DX11UI,
-    utils::{eguiutils::ImGuiUtils, prompter::Prompter},
+    utils::prompter::Prompter,
     winutils::{Renderer, WinUtils},
 };
 use hudhook::{
@@ -37,7 +35,11 @@ use hudhook::{
 };
 use parking_lot::RwLock;
 use smallvec::SmallVec;
-use std::{ffi::c_void, io::IsTerminal, sync::Arc};
+use std::{
+    ffi::c_void,
+    io::IsTerminal,
+    sync::{atomic::AtomicBool, Arc},
+};
 use utils::hooks::GenericHoooks;
 use windows::Win32::{
     Foundation::BOOL,
@@ -71,8 +73,6 @@ extern "system" fn DllMain(
 
 /// Begins initializing and hooking everything.
 fn hook(hmodule: HINSTANCE) {
-    unsafe { ImGuiUtils::init() };
-
     // Allocate a console window.
     let is_terminal = std::io::stdout().is_terminal();
     let allocated = unsafe { AllocConsole() }.is_ok();
@@ -137,34 +137,36 @@ fn prepare_hooks(base_core: Arc<RwLock<BaseCore>>, hmodule: HINSTANCE) {
 /// Intended for `GameTitle::Unknown` where it figures out the renderer and hooks based on the
 /// result.
 fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: HINSTANCE) {
-    let generic_hooks = GenericHoooks::init();
     let mut builder = Hudhook::builder().with_hmodule(hmodule);
     let base_core_reader = base_core.read();
     let renderer_target = base_core_reader.get_config().get_renderer_target();
     let mut setup_ui = true;
 
     // Determine the renderer target from the config.
-    let disable_set_cursor_pos_clone = Arc::clone(&generic_hooks.disable_set_cursor_pos);
     match renderer_target {
         Renderer::DirectX9 => {
+            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
             builder = builder.with::<ImguiDx9Hooks>(DX11UI::new(
                 Arc::clone(&base_core),
                 disable_set_cursor_pos_clone,
             ));
         }
         Renderer::DirectX11 => {
+            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
             builder = builder.with::<ImguiDx11Hooks>(DX11UI::new(
                 Arc::clone(&base_core),
                 disable_set_cursor_pos_clone,
             ));
         }
         Renderer::DirectX12 => {
+            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
             builder = builder.with::<ImguiDx12Hooks>(DX11UI::new(
                 Arc::clone(&base_core),
                 disable_set_cursor_pos_clone,
             ));
         }
         Renderer::OpenGL => {
+            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
             builder = builder.with::<ImguiOpenGl3Hooks>(DX11UI::new(
                 Arc::clone(&base_core),
                 disable_set_cursor_pos_clone,
@@ -177,15 +179,14 @@ fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: HINSTANCE) 
     }
 
     if setup_ui {
-        // Apply hook.
-        if let Err(error) = builder.build().apply() {
+        builder.build().apply().unwrap_or_else(|error| {
             crash!(
                 "[ERROR] Failed applying UI hook. Render Target: ",
                 format!("{renderer_target:?}"),
                 ", error: ",
                 format!("{error:?}")
-            );
-        }
+            )
+        });
     } else {
         drop(builder);
     }
@@ -211,6 +212,14 @@ fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: HINSTANCE) 
             false,
         );
     });
+}
+
+/// Installs generic hooks and returns the instance, including the `disable_set_cursor_pos`
+/// `Arc<AtomicBool>`.
+fn setup_generic_hooks() -> (GenericHoooks, Arc<AtomicBool>) {
+    let generic_hooks = GenericHoooks::init();
+    let disable_set_cursor_pos_clone = Arc::clone(&generic_hooks.disable_set_cursor_pos);
+    (generic_hooks, disable_set_cursor_pos_clone)
 }
 
 /// Called when a console command should be looked up and executed, after everything's initialized.

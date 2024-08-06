@@ -2,6 +2,7 @@ use crate::utils::{
     api::API,
     config::Config,
     crosscom::{CrossCom, CrossComState},
+    eguiutils::ImGuiUtils,
     extensions::OptionExt,
     prompter::Prompter,
     scripting::{arctic::Arctic, script_core::ScriptCore},
@@ -27,6 +28,9 @@ pub struct BaseCore {
 
     /// Arctic Gateway core.
     arctic_core: OnceLock<Arctic>,
+
+    /// ImGuiUtils instance.
+    imgui_utils: Arc<RwLock<ImGuiUtils>>,
 }
 
 thread_safe_structs!(BaseCore);
@@ -63,6 +67,7 @@ impl BaseCore {
             script_core: ScriptCore::init(),
             custom_window_utils: LazyLock::new(|| Box::leak(Box::default())),
             arctic_core: OnceLock::new(),
+            imgui_utils: Arc::new(RwLock::new(ImGuiUtils::new())),
         }
     }
 
@@ -151,5 +156,10 @@ impl BaseCore {
     /// Gets the Arctic Gateway core.
     pub const fn get_arctic_core(&self) -> &OnceLock<Arctic> {
         &self.arctic_core
+    }
+
+    /// Gets the `ImGuiUtils` instance.
+    pub fn get_imgui_utils(&self) -> Arc<RwLock<ImGuiUtils>> {
+        Arc::clone(&self.imgui_utils)
     }
 }

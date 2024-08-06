@@ -206,9 +206,19 @@ impl CustomWindowsUtils {
                 font_token.pop();
             }
             WidgetType::LabelCustomFont(content, relative_font_path) => {
-                let Some(font_token) =
-                    ImGuiUtils::activate_custom_font(ui, Arc::clone(relative_font_path))
-                else {
+                let Some(base_core_reader) = base_core.try_read() else {
+                    return;
+                };
+
+                let imgui_utils = base_core_reader.get_imgui_utils();
+                let Some(imgui_utils_reader) = imgui_utils.try_read() else {
+                    return;
+                };
+
+                let Some(font_token) = ImGuiUtils::activate_font(
+                    ui,
+                    imgui_utils_reader.get_cfont_from_rpath(Arc::clone(relative_font_path)),
+                ) else {
                     log!(
                         "[ERROR] Failed activating non-installed font from relative path at \"",
                         relative_font_path,

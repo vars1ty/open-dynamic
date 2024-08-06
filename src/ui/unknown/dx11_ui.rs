@@ -233,13 +233,21 @@ impl DX11UI {
 impl ImguiRenderLoop for DX11UI {
     /// Called as the UI has been initialized.
     fn initialize<'a>(&'a mut self, ctx: &mut Context, _: &'a mut dyn RenderContext) {
-        unsafe {
-            ImGuiUtils::get_self_mut().apply_style(
-                ctx,
-                self.base_core.read().get_config(),
-                self.base_core.read().get_crosscom(),
-            )
-        };
+        let base_core_reader = self
+            .base_core
+            .try_read()
+            .unwrap_or_crash(zencstr!("[ERROR] BaseCore is locked!"));
+
+        let imgui_utils = base_core_reader.get_imgui_utils();
+        let mut imgui_utils_writer = imgui_utils
+            .try_write()
+            .unwrap_or_crash(zencstr!("[ERROR] ImGuiUtils is locked!"));
+
+        imgui_utils_writer.apply_style(
+            ctx,
+            base_core_reader.get_config(),
+            base_core_reader.get_crosscom(),
+        )
     }
 
     /// Called before rendering the UI.
@@ -253,7 +261,18 @@ impl ImguiRenderLoop for DX11UI {
 
     /// Renders the UI.
     fn render(&mut self, ui: &mut imgui::Ui) {
-        unsafe { ImGuiUtils::get_self_mut() }.draw_screen_messages(ui);
+        let base_core = Arc::clone(&self.base_core);
+        let Some(base_core_reader) = base_core.try_read() else {
+            return;
+        };
+
+        let imgui_utils = base_core_reader.get_imgui_utils();
+        let Some(mut imgui_utils_writer) = imgui_utils.try_write() else {
+            return;
+        };
+
+        imgui_utils_writer.draw_screen_messages(ui);
+
         self.execute_pending_scripts();
         self.on_toggle_ui();
         if !self.display_ui {
@@ -262,8 +281,7 @@ impl ImguiRenderLoop for DX11UI {
 
         self.disable_set_cursor_pos
             .store(ui.io().want_capture_mouse, Ordering::SeqCst);
-        self.base_core
-            .read()
+        base_core_reader
             .get_custom_window_utils()
             .draw_custom_windows(ui, Arc::clone(&self.base_core));
 
@@ -308,7 +326,7 @@ impl ImguiRenderLoop for DX11UI {
                     .build();
                 ui.checkbox(
                     zencstr!("󰵅 Enable Side Messages"),
-                    &mut unsafe { ImGuiUtils::get_self_mut() }.enable_side_messages,
+                    &mut imgui_utils_writer.enable_side_messages,
                 );
                 ui.separator();
 

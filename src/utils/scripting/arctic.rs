@@ -125,7 +125,8 @@ pub struct DNXFunctions {
     imgui_group: extern "Rust" fn(&Ui, Box<dyn FnOnce()>),
     imgui_input_text_multiline: extern "Rust" fn(&Ui, &str, &mut String, [f32; 2]) -> bool,
     imgui_input_text: extern "Rust" fn(&Ui, &str, &mut String) -> bool,
-    imgui_activate_font_by_rpath: extern "Rust" fn(&Ui, Arc<String>) -> FontStackToken<'_>,
+    imgui_activate_font_by_rpath:
+        Box<dyn Fn(&Ui, Arc<String>) -> Option<FontStackToken<'_>> + Send + Sync>,
     imgui_pop_font: extern "Rust" fn(&Ui, FontStackToken<'_>),
     imgui_dummy: extern "Rust" fn(&Ui, [f32; 2]),
     imgui_same_line: extern "Rust" fn(&Ui),
@@ -176,6 +177,8 @@ impl Arctic {
                 let crosscom_server_get_current_channel = base_core_reader.get_crosscom();
                 let crosscom_server_join_channel = base_core_reader.get_crosscom();
                 let crosscom_server_send_script = base_core_reader.get_crosscom();
+
+                let imgui_utils = base_core_reader.get_imgui_utils();
 
                 let config = base_core_reader.get_config();
                 let serials = config.get_product_serials();
@@ -330,16 +333,14 @@ impl Arctic {
                     imgui_set_next_item_width: |ui, width| ui.set_next_item_width(width),
                     imgui_current_column_index: |ui| ui.current_column_index(),
                     imgui_current_column_offset: |ui| ui.current_column_offset(),
-                    imgui_activate_font_by_rpath: |ui, relative_font_path| {
-                        // TODO: Make this return the Option<T> instead of crashing.
-                        let relative_font_path_clone = Arc::clone(&relative_font_path);
-                        ImGuiUtils::activate_custom_font(ui, relative_font_path_clone)
-                            .unwrap_or_crash(zencstr!(
-                                "[ERROR] Font at relative path \"",
-                                relative_font_path,
-                                "\" was not found!"
-                            ))
-                    },
+                    imgui_activate_font_by_rpath: Box::new(move |ui, relative_font_path| {
+                        ImGuiUtils::activate_font(
+                            ui,
+                            imgui_utils
+                                .try_read()?
+                                .get_cfont_from_rpath(Arc::clone(&relative_font_path)),
+                        )
+                    }),
                     imgui_set_item_default_focus: |ui| ui.set_item_default_focus(),
                     config_get_serials: Box::new(|| serials),
                 };
