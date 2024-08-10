@@ -267,11 +267,12 @@ impl ImguiRenderLoop for DX11UI {
         };
 
         let imgui_utils = base_core_reader.get_imgui_utils();
-        let Some(mut imgui_utils_writer) = imgui_utils.try_write() else {
+        let Some(imgui_utils_reader) = imgui_utils.try_read() else {
             return;
         };
 
-        imgui_utils_writer.draw_screen_messages(ui);
+        imgui_utils_reader.draw_screen_messages(ui);
+        drop(imgui_utils_reader);
 
         self.execute_pending_scripts();
         self.on_toggle_ui();
@@ -322,12 +323,18 @@ impl ImguiRenderLoop for DX11UI {
             .size([300.0, 110.0], Condition::FirstUseEver)
             .collapsed(true, Condition::Once)
             .build(|| {
+                let imgui_utils = base_core_reader.get_imgui_utils();
+                let Some(mut imgui_utils_writer) = imgui_utils.try_write() else {
+                    return;
+                };
+
                 ui.input_text(zencstr!("󰷔 CrossCom Channel"), &mut self.crosscom_channel)
                     .build();
                 ui.checkbox(
                     zencstr!("󰵅 Enable Side Messages"),
                     &mut imgui_utils_writer.enable_side_messages,
                 );
+                drop(imgui_utils_writer);
                 ui.separator();
 
                 if ui.button(zencstr!("󱘖 Join Channel")) {
