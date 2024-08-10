@@ -135,10 +135,9 @@ impl ImGuiUtils {
         const MAIN_DARK_GRAY: [f32; 4] = ColorUtils::rgba_to_frgba([20, 20, 20, 255]);
         const MAIN_DARKISH_GRAY: [f32; 4] = ColorUtils::rgba_to_frgba([25, 25, 25, 255]);
 
-        // Purple from https://colorhunt.co/palette/6528f7a076f9d7bbf5ede4ff
-        const PURPLE_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([83, 86, 255, 255]);
-        const PURPLE_ALMOST_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([83, 86, 255, 230]);
-        const PURPLE_HINT: [f32; 4] = ColorUtils::rgba_to_frgba([83, 86, 255, 220]);
+        const RED_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 46, 0, 255]);
+        const RED_ALMOST_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 46, 0, 230]);
+        const RED_HINT: [f32; 4] = ColorUtils::rgba_to_frgba([255, 46, 0, 220]);
 
         let mut colors = style.colors;
         // Main canvas
@@ -151,30 +150,30 @@ impl ImGuiUtils {
 
         // Frame
         colors[ImGuiCol_FrameBg as usize] = MAIN_DARK_GRAY;
-        colors[ImGuiCol_FrameBgHovered as usize] = PURPLE_ALMOST_FULL;
-        colors[ImGuiCol_FrameBgActive as usize] = PURPLE_FULL;
+        colors[ImGuiCol_FrameBgHovered as usize] = RED_ALMOST_FULL;
+        colors[ImGuiCol_FrameBgActive as usize] = RED_FULL;
 
         // Scrollbar
-        colors[ImGuiCol_ScrollbarGrab as usize] = PURPLE_HINT;
-        colors[ImGuiCol_ScrollbarGrabHovered as usize] = PURPLE_ALMOST_FULL;
-        colors[ImGuiCol_ScrollbarGrabActive as usize] = PURPLE_FULL;
+        colors[ImGuiCol_ScrollbarGrab as usize] = RED_HINT;
+        colors[ImGuiCol_ScrollbarGrabHovered as usize] = RED_ALMOST_FULL;
+        colors[ImGuiCol_ScrollbarGrabActive as usize] = RED_FULL;
 
         // Button
-        colors[ImGuiCol_Button as usize] = PURPLE_HINT;
-        colors[ImGuiCol_ButtonHovered as usize] = PURPLE_ALMOST_FULL;
-        colors[ImGuiCol_ButtonActive as usize] = PURPLE_FULL;
+        colors[ImGuiCol_Button as usize] = RED_HINT;
+        colors[ImGuiCol_ButtonHovered as usize] = RED_ALMOST_FULL;
+        colors[ImGuiCol_ButtonActive as usize] = RED_FULL;
 
         // Tab
-        colors[ImGuiCol_Tab as usize] = PURPLE_HINT;
-        colors[ImGuiCol_TabHovered as usize] = PURPLE_ALMOST_FULL;
-        colors[ImGuiCol_TabActive as usize] = PURPLE_FULL;
+        colors[ImGuiCol_Tab as usize] = RED_HINT;
+        colors[ImGuiCol_TabHovered as usize] = RED_ALMOST_FULL;
+        colors[ImGuiCol_TabActive as usize] = RED_FULL;
 
         // Checkmark
-        colors[ImGuiCol_CheckMark as usize] = PURPLE_HINT;
+        colors[ImGuiCol_CheckMark as usize] = RED_HINT;
 
         // Slider
-        colors[ImGuiCol_SliderGrab as usize] = PURPLE_HINT;
-        colors[ImGuiCol_SliderGrabActive as usize] = PURPLE_ALMOST_FULL;
+        colors[ImGuiCol_SliderGrab as usize] = RED_HINT;
+        colors[ImGuiCol_SliderGrabActive as usize] = RED_ALMOST_FULL;
 
         // Resize
         colors[ImGuiCol_ResizeGrip as usize] = MAIN_DARKISH_GRAY;
@@ -182,9 +181,9 @@ impl ImGuiUtils {
         colors[ImGuiCol_ResizeGripActive as usize] = MAIN_DARK;
 
         // Drop Down
-        colors[ImGuiCol_Header as usize] = PURPLE_HINT;
-        colors[ImGuiCol_HeaderHovered as usize] = PURPLE_ALMOST_FULL;
-        colors[ImGuiCol_HeaderActive as usize] = PURPLE_FULL;
+        colors[ImGuiCol_Header as usize] = RED_HINT;
+        colors[ImGuiCol_HeaderHovered as usize] = RED_ALMOST_FULL;
+        colors[ImGuiCol_HeaderActive as usize] = RED_FULL;
         style.colors = colors;
     }
 
