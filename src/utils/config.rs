@@ -252,6 +252,6 @@ impl Config {
     pub fn get_use_new_rune_thread(&self) -> bool {
         self.get()[&zencstr!("use_new_rune_thread").data]
             .as_bool()
-            .unwrap_or_default()
+            .unwrap_or(true)
     }
 }

@@ -308,10 +308,12 @@ impl Arctic {
                     imgui_window_size: |ui| ui.window_size(),
                     imgui_next_column: |ui| ui.next_column(),
                     imgui_begin_combo: |ui, text, preview_value, closure| {
-                        if let Some(combo) = ui.begin_combo(text, preview_value) {
-                            closure();
-                            combo.end();
-                        }
+                        let Some(combo) = ui.begin_combo(text, preview_value) else {
+                            return;
+                        };
+
+                        closure();
+                        combo.end();
                     },
                     imgui_column_width: |ui, id| ui.column_width(id),
                     imgui_window_add_rect: |ui, start, end, rounding, filled, color| {
@@ -433,7 +435,7 @@ impl Arctic {
             // Attempt eject.
             Syringe::for_process(process)
                 .eject(payload)
-                .unwrap_or_else(|error| crash!("[ERROR] Ejection error: ", error, ""));
+                .unwrap_or_else(|error| crash!("[ERROR] Ejection error: ", error));
         });
     }
 
