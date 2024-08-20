@@ -174,7 +174,7 @@ impl CrossCom {
             log!("## DEVELOPMENT SERVER ACTIVE ##");
             zencstr!("0.0.0.0:8391")
         } else {
-            zencstr!(include_str!("../../crosscom_ip"))
+            zencstr!(include_str!("../../crosscom_ip").replace(['\n', '\r'], ""))
         };
 
         // Connect via FramedTcp.
