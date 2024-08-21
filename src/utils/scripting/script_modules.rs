@@ -24,6 +24,8 @@ use std::{
 use windows::Win32::System::{Console::AllocConsole, Threading::GetCurrentProcess};
 use wmem::Memory;
 
+use super::{fncaller::FNCaller, script_core::ScriptCore};
+
 /// Wrapper around `Value` to force it to be "thread-safe".
 struct ValueWrapper(pub Value);
 thread_safe_structs!(ValueWrapper);
@@ -38,6 +40,7 @@ impl SystemModules {
         crosscom: Arc<RwLock<CrossCom>>,
         serials: &'static Vec<String>,
     ) -> Result<SmallVec<[Module; 13]>, ContextError> {
+        let mut module = Module::new();
         let mut dynamic_module = Module::with_crate(&zencstr!("dynamic").data)?;
         let mut compiler_module = Module::with_crate(&zencstr!("Compiler").data)?;
         let mut task_module = Module::with_crate(&zencstr!("Task").data)?;
@@ -51,6 +54,8 @@ impl SystemModules {
         let mut fs_module = Module::with_crate(&zencstr!("FileSystem").data)?;
         let mut arctic_module = Module::with_crate(&zencstr!("Arctic").data)?;
         let mut utils_module = Module::with_crate(&zencstr!("Utils").data)?;
+
+        module.ty::<RuneDoubleResultPrimitive>()?;
 
         dynamic_module
             .function("log", |data: String| {
@@ -161,6 +166,18 @@ impl SystemModules {
         memory_module
             .function("read_string", Self::read_string)
             .build()?;
+
+        memory_module
+            .function("fn_call", |fn_addr, params: Vec<Value>| {
+                FNCaller::call_auto(fn_addr, params)
+            })
+            .build()?;
+        memory_module
+            .function("value_as_ptr", |value: Value| {
+                ScriptCore::value_as_ptr(&value).map(|value| value as i64)
+            })
+            .build()?;
+
         math_module
             .function("lerp", |value: f32, to: f32, time: f32| {
                 value.lerp(to, time)
@@ -228,6 +245,7 @@ impl SystemModules {
             .build()?;
 
         Ok(smallvec![
+            module,
             dynamic_module,
             compiler_module,
             task_module,

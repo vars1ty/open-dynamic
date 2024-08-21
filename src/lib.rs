@@ -1,7 +1,6 @@
-#![recursion_limit = "256"]
 #![feature(const_fn_floating_point_arithmetic)]
-#![feature(sync_unsafe_cell)]
 #![feature(optimize_attribute)]
+#![feature(c_variadic)]
 #[macro_use]
 extern crate smallvec;
 

@@ -14,7 +14,7 @@ use rune::{
     termcolor::{ColorChoice, StandardStream},
     *,
 };
-use std::{error::Error, sync::Arc};
+use std::{error::Error, ffi::CString, sync::Arc};
 use zstring::ZString;
 
 /// Structure that implements Send and Sync so that the `Vm` inside of it can be sent between
@@ -364,5 +364,40 @@ impl ScriptCore {
                 "[ERROR] Cross Modules is locked, modules cannot be inserted!"
             ))
             .push(module);
+    }
+
+    /// Casts `data` as a `*const i64` pointer, note that this is **not** recommended for
+    /// floating-point numbers.
+    /// If a string, the C-String is "forgotten about" and should be dropped manually!
+    pub fn value_as_ptr(data: &Value) -> Option<*const i64> {
+        if let Ok(data_i64) = data.to_owned().into_integer().into_result() {
+            return Some(data_i64 as *const i64);
+        }
+
+        if let Ok(data_usize) = data.to_owned().into_usize().into_result() {
+            return Some(data_usize as *const usize as *const i64);
+        }
+
+        if let Ok(data_f64) = data.to_owned().into_float().into_result() {
+            return Some(unsafe {
+                std::mem::transmute::<*const f64, *const i64>(&data_f64 as *const f64)
+            });
+        }
+
+        let Ok(data_string) = data.to_owned().into_string().into_result() else {
+            return None;
+        };
+
+        let Ok(data_string) = data_string.borrow_ref() else {
+            return None;
+        };
+
+        let cstr = CString::new(data_string.to_owned()).ok()?;
+        let ptr = cstr.as_ptr();
+
+        // Forget the C-String so it doesn't get deallocated instantly.
+        // It should be manually deallocated after usage.
+        std::mem::forget(cstr);
+        Some(ptr as *const i64)
     }
 }
