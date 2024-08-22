@@ -356,29 +356,6 @@ impl WinUtils {
         unsafe { (base_address as *const i64).byte_add(offset) }
     }
 
-    /// Gets the foreground window rect.
-    pub fn get_window_rect() -> RECT {
-        let mut rect = RECT {
-            ..Default::default()
-        };
-        unsafe { GetWindowRect(GetForegroundWindow(), &mut rect).unwrap_or_default() };
-        rect
-    }
-
-    /// Gets the foreground window height.
-    pub fn get_window_height() -> RuneDoubleResultPrimitive {
-        let rect = Self::get_window_rect();
-        let height = rect.bottom - rect.top;
-        RuneDoubleResultPrimitive::new(height, height as i64, height as f32, height as f64)
-    }
-
-    /// Gets the foreground window width.
-    pub fn get_window_width() -> RuneDoubleResultPrimitive {
-        let rect = Self::get_window_rect();
-        let width = rect.right - rect.left;
-        RuneDoubleResultPrimitive::new(width, width as i64, width as f32, width as f64)
-    }
-
     /// Returns the cursor position within the foreground window.
     /// This requires an already-made `POINT` instance, as it will output the data to it.
     pub fn get_cursor_pos_recycle(point: &mut POINT) {

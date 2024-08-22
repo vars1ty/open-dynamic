@@ -104,7 +104,7 @@ pub struct DNXFunctions {
     config_get_path: Box<dyn Fn() -> &'static str + Send + Sync>,
 
     /// Gets all of the serials from the config.
-    config_get_serials: Box<dyn Fn() -> &'static Vec<String> + Send + Sync>,
+    config_get_serials: Box<dyn Fn() -> Arc<Vec<String>> + Send + Sync>,
 
     // ImGui functions, no explanation needed as they are self-explanatory and documented online.
     imgui_text: extern "Rust" fn(&Ui, &str),
@@ -181,7 +181,10 @@ impl Arctic {
                 let imgui_utils = base_core_reader.get_imgui_utils();
 
                 let config = base_core_reader.get_config();
-                let serials = config.get_product_serials();
+                let serials_sellix_is_paying_for_product = config.get_product_serials();
+                let serials_config_has_serial = config.get_product_serials();
+                let serials_config_get_serials = config.get_product_serials();
+
                 let base_core_rune = Arc::clone(&base_core);
                 let base_core_install_rune_module = Arc::clone(&base_core);
                 let injected_dlls = Arc::clone(&injected_dlls);
@@ -223,10 +226,12 @@ impl Arctic {
                         crosscom_check_is_ex_serial_ok.read().check_is_ex_serial_ok(
                             product_id,
                             bearer_token,
-                            serials,
+                            Arc::clone(&serials_sellix_is_paying_for_product),
                         )
                     }),
-                    config_has_serial: Box::new(move |serial| serials.contains(&serial)),
+                    config_has_serial: Box::new(move |serial| {
+                        serials_config_has_serial.contains(&serial)
+                    }),
                     server_aob_scan: Box::new(
                         move |variable_name, base_address, sig_scan_address| {
                             let crosscom = Arc::clone(&crosscom_server_aob_scan);
@@ -344,7 +349,7 @@ impl Arctic {
                         )
                     }),
                     imgui_set_item_default_focus: |ui| ui.set_item_default_focus(),
-                    config_get_serials: Box::new(|| serials),
+                    config_get_serials: Box::new(move || Arc::clone(&serials_config_get_serials)),
                 };
 
                 // Create the OnceLock instance and assign it before returning.

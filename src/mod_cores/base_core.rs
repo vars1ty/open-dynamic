@@ -40,10 +40,14 @@ impl BaseCore {
     pub fn init() -> Self {
         let config: &'static Config = Box::leak(Box::default());
         let use_local_server = config.get_use_local_server();
-        let main_serial = config
-            .get_product_serials()
-            .first()
-            .unwrap_or_crash(zencstr!("[ERROR] Missing primary NDNX/INTERNAL serial!"));
+        let main_serial = Box::leak(Box::new(
+            config
+                .get_product_serials()
+                .first()
+                .unwrap_or_crash(zencstr!("[ERROR] Missing primary NDNX/INTERNAL serial!"))
+                .to_owned(),
+        ));
+
         Self {
             config,
             crosscom: {

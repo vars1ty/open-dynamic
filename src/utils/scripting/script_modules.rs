@@ -1,3 +1,4 @@
+use super::{fncaller::FNCaller, script_core::ScriptCore};
 use crate::{
     globals::*,
     mod_cores::base_core::BaseCore,
@@ -24,8 +25,6 @@ use std::{
 use windows::Win32::System::{Console::AllocConsole, Threading::GetCurrentProcess};
 use wmem::Memory;
 
-use super::{fncaller::FNCaller, script_core::ScriptCore};
-
 /// Wrapper around `Value` to force it to be "thread-safe".
 struct ValueWrapper(pub Value);
 thread_safe_structs!(ValueWrapper);
@@ -38,7 +37,7 @@ impl SystemModules {
     pub fn build(
         base_core: Arc<RwLock<BaseCore>>,
         crosscom: Arc<RwLock<CrossCom>>,
-        serials: &'static Vec<String>,
+        serials: Arc<Vec<String>>,
     ) -> Result<SmallVec<[Module; 13]>, ContextError> {
         let mut module = Module::new();
         let mut dynamic_module = Module::with_crate(&zencstr!("dynamic").data)?;
@@ -123,12 +122,6 @@ impl SystemModules {
             .function("get_cursor_y", Self::get_cursor_y)
             .build()?;
         windows_module
-            .function("get_window_height", WinUtils::get_window_height)
-            .build()?;
-        windows_module
-            .function("get_window_width", WinUtils::get_window_width)
-            .build()?;
-        windows_module
             .function("show_alert", |caption: String, text: String| {
                 WinUtils::display_message_box(&caption, &text, 0x00000010)
             })
@@ -185,13 +178,17 @@ impl SystemModules {
             .build()?;
         math_module.function("ptr_add", Self::ptr_add).build()?;
         math_module.function("ptr_sub", Self::ptr_sub).build()?;
+
+        let serials_clone = Arc::clone(&serials);
         sellix_module
             .function(
                 "is_paying_for_product",
                 move |product_id: String, bearer_token: String| {
-                    crosscom
-                        .read()
-                        .check_is_ex_serial_ok(product_id, bearer_token, serials)
+                    crosscom.read().check_is_ex_serial_ok(
+                        product_id,
+                        bearer_token,
+                        Arc::clone(&serials_clone),
+                    )
                 },
             )
             .build()?;
@@ -450,16 +447,14 @@ impl SystemModules {
         }
     }
 
-    /// Gets the X-Coordinate of the cursor.
-    fn get_cursor_x() -> RuneDoubleResultPrimitive {
-        let x = WinUtils::get_cursor_pos().x;
-        RuneDoubleResultPrimitive::new(x, x as i64, x as f32, x as f64)
-    }
-
-    /// Gets the Y-Coordinate of the cursor.
-    fn get_cursor_y() -> RuneDoubleResultPrimitive {
-        let y = WinUtils::get_cursor_pos().y;
-        RuneDoubleResultPrimitive::new(y, y as i64, y as f32, y as f64)
+    /// Gets the X and Y-Coordinate of the cursor.
+    fn get_cursor_xy() -> [RuneDoubleResultPrimitive; 2] {
+        let cursor_pos = WinUtils::get_cursor_pos();
+        let (x, y) = (cursor_pos.x, cursor_pos.y);
+        [
+            RuneDoubleResultPrimitive::new(x, x as i64, x as f32, x as f64),
+            RuneDoubleResultPrimitive::new(y, y as i64, y as f32, y as f64),
+        ]
     }
 
     /// Attempts to parse the given data as a number.

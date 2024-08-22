@@ -8,6 +8,7 @@ use std::{
     fmt::Display,
     fs::read_to_string,
     io::{Result, Write},
+    sync::Arc,
 };
 
 /// Simple JSON config.
@@ -19,7 +20,7 @@ pub struct Config {
     path: &'static str,
 
     /// Custom product serials.
-    serials: &'static Vec<String>,
+    serials: Arc<Vec<String>>,
 }
 
 thread_safe_structs!(Config);
@@ -76,7 +77,7 @@ impl Default for Config {
         Self {
             cached_config,
             path: dir_path.leak(),
-            serials: Box::leak(Box::new(serials)),
+            serials: Arc::new(serials),
         }
     }
 }
@@ -182,8 +183,8 @@ impl Config {
     }
 
     /// Gets the user-defined product serials, if any.
-    pub const fn get_product_serials(&self) -> &'static Vec<String> {
-        self.serials
+    pub fn get_product_serials(&self) -> Arc<Vec<String>> {
+        Arc::clone(&self.serials)
     }
 
     /// Gets the renderer target to be used for unsupported games.
