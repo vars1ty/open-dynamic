@@ -32,8 +32,13 @@ impl Default for Config {
             .data
             .replace(&zencstr!("dynamic.dll").data, "");
         let path = zencstr!(&dir_path, "config.jsonc");
-        let config_content = read_to_string(&path.data)
-            .unwrap_or_else(|error| crash!("[ERROR] Couldn't read config.jsonc, error: ", error));
+        let config_content = read_to_string(&path.data).unwrap_or_else(|error| {
+            crash!(
+                "[ERROR] Couldn't read config.jsonc, error: ",
+                error,
+                "\n[INFO] This is entirely your own fault, and not dynamics. Learn JSON!"
+            )
+        });
         drop(path);
 
         let cached_config: OnceCell<Value> = OnceCell::new();
