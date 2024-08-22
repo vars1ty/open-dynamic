@@ -15,10 +15,10 @@ use crate::{
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rune::{ContextError, Module, Value};
-use smallvec::SmallVec;
 use std::{
     ffi::CString,
     fmt::{Debug, Display},
+    rc::Rc,
     str::FromStr,
     sync::Arc,
 };
@@ -38,7 +38,7 @@ impl SystemModules {
         base_core: Arc<RwLock<BaseCore>>,
         crosscom: Arc<RwLock<CrossCom>>,
         serials: Arc<Vec<String>>,
-    ) -> Result<SmallVec<[Module; 13]>, ContextError> {
+    ) -> Result<Vec<Module>, ContextError> {
         let mut module = Module::new();
         let mut dynamic_module = Module::with_crate(&zencstr!("dynamic").data)?;
         let mut compiler_module = Module::with_crate(&zencstr!("Compiler").data)?;
@@ -116,10 +116,7 @@ impl SystemModules {
             .function("to_radians", |value: f32| value.to_radians())
             .build()?;
         windows_module
-            .function("get_cursor_x", Self::get_cursor_x)
-            .build()?;
-        windows_module
-            .function("get_cursor_y", Self::get_cursor_y)
+            .function("get_cursor_xy", Self::get_cursor_xy)
             .build()?;
         windows_module
             .function("show_alert", |caption: String, text: String| {
@@ -168,6 +165,11 @@ impl SystemModules {
         memory_module
             .function("value_as_ptr", |value: Value| {
                 ScriptCore::value_as_ptr(&value).map(|value| value as i64)
+            })
+            .build()?;
+        memory_module
+            .function("free_cstring", |ptr: i64| {
+                drop(unsafe { CString::from_raw(ptr as _) });
             })
             .build()?;
 
@@ -241,7 +243,7 @@ impl SystemModules {
             })
             .build()?;
 
-        Ok(smallvec![
+        Ok(vec![
             module,
             dynamic_module,
             compiler_module,
@@ -254,7 +256,7 @@ impl SystemModules {
             sellix_module,
             config_module,
             fs_module,
-            arctic_module
+            arctic_module,
         ])
     }
 
@@ -435,6 +437,7 @@ impl SystemModules {
     /// Reads a primitive from `address`.
     fn read_primitive(address: i64) -> RuneDoubleResultPrimitive {
         if address == 0 {
+            log!("[ERROR] read_primitive called with a nullptr, returning RuneDoubleResultPrimitive::default()!");
             return RuneDoubleResultPrimitive::default();
         }
 
@@ -448,13 +451,17 @@ impl SystemModules {
     }
 
     /// Gets the X and Y-Coordinate of the cursor.
-    fn get_cursor_xy() -> [RuneDoubleResultPrimitive; 2] {
+    fn get_cursor_xy() -> Vec<RuneDoubleResultPrimitive> {
+        let mut vec = Vec::with_capacity(2);
         let cursor_pos = WinUtils::get_cursor_pos();
         let (x, y) = (cursor_pos.x, cursor_pos.y);
-        [
-            RuneDoubleResultPrimitive::new(x, x as i64, x as f32, x as f64),
-            RuneDoubleResultPrimitive::new(y, y as i64, y as f32, y as f64),
-        ]
+        vec.push(RuneDoubleResultPrimitive::new(
+            x, x as i64, x as f32, x as f64,
+        ));
+        vec.push(RuneDoubleResultPrimitive::new(
+            y, y as i64, y as f32, y as f64,
+        ));
+        vec
     }
 
     /// Attempts to parse the given data as a number.
@@ -577,8 +584,16 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_button", move |identifier, text, rune_code| {
-                custom_window_utils.add_widget(identifier, WidgetType::Button(text, rune_code))
+            .function("add_button", move |identifier, text, function| {
+                custom_window_utils
+                    .add_widget(identifier, WidgetType::Button(text, Rc::new(function)))
+            })
+            .build()?;
+
+        module
+            .function("add_legacy_button", move |identifier, text, rune_code| {
+                custom_window_utils
+                    .add_widget(identifier, WidgetType::LegacyButton(text, rune_code))
             })
             .build()?;
 

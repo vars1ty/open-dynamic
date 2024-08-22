@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use rune::runtime::Function;
 use std::{rc::Rc, sync::Arc};
 
 /// ImGui widget type.
@@ -6,7 +7,8 @@ use std::{rc::Rc, sync::Arc};
 pub enum WidgetType {
     Label(String, usize),
     LabelCustomFont(String, Arc<String>),
-    Button(String, String),
+    Button(String, Rc<Function>),
+    LegacyButton(String, String),
     Spacing(f32, f32),
     Separator,
     F32Slider(String, f32, f32, f32),

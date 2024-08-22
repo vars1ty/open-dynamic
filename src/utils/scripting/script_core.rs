@@ -393,11 +393,6 @@ impl ScriptCore {
         };
 
         let cstr = CString::new(data_string.to_owned()).ok()?;
-        let ptr = cstr.as_ptr();
-
-        // Forget the C-String so it doesn't get deallocated instantly.
-        // It should be manually deallocated after usage.
-        std::mem::forget(cstr);
-        Some(ptr as *const i64)
+        Some(cstr.into_raw() as *const i64)
     }
 }

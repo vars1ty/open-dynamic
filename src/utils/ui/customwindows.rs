@@ -230,7 +230,21 @@ impl CustomWindowsUtils {
                 label!(ui, content);
                 font_token.pop();
             }
-            WidgetType::Button(text, rune_code) => {
+            WidgetType::Button(text, function) => {
+                if !button!(ui, text) {
+                    return;
+                };
+
+                if let Err(error) = function.call::<(), ()>(()).into_result() {
+                    log!(
+                        "[ERROR] Failed calling button function on \"",
+                        identifier,
+                        "\", error: ",
+                        error
+                    );
+                }
+            }
+            WidgetType::LegacyButton(text, rune_code) => {
                 if button!(ui, text) && !rune_code.is_empty() {
                     self.execute_rune_code(rune_code);
                 }
