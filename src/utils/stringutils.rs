@@ -21,10 +21,10 @@ impl StringUtils {
 
     /// Converts a hex string to its byte-slice representation.
     pub fn hex_string_to_bytes(hex_string: String) -> Option<Vec<u8>> {
-        // Remove whitespaces.
-        let hex_string = hex_string
-            .replace(' ', "")
-            .replace(&zencstr!("??").data, &zencstr!("7F").data);
+        unsafe {
+            // Remove whitespaces with 1 allocation, then replace "??" with "7F" without allocating.
+            Self::replace_zero_alloc(&mut hex_string.replace(' ', ""), b"??", b"7F");
+        }
 
         if hex_string.len() % 2 != 0 {
             log!(
@@ -49,5 +49,23 @@ impl StringUtils {
         }
 
         Some(bytes)
+    }
+
+    /// Takes `string` and replaces `lookup` with `replacement`.
+    /// # Safety
+    /// `lookup` **has** to be the same length as `replacement`, as the function works on the raw
+    /// underlying bytes and cannot differ in size.
+    pub unsafe fn replace_zero_alloc(string: &mut str, lookup: &[u8], replacement: &[u8]) {
+        if lookup.len() != replacement.len() {
+            log!("[ERROR] lookup length isn't the same as replacement!");
+            return;
+        }
+
+        let bytes = unsafe { string.as_bytes_mut() };
+        for i in 0..(bytes.len() - replacement.len() + 1) {
+            if &bytes[i..i + replacement.len()] == lookup {
+                bytes[i..i + replacement.len()].copy_from_slice(replacement);
+            }
+        }
     }
 }
