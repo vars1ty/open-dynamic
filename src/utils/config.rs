@@ -11,6 +11,8 @@ use std::{
     sync::Arc,
 };
 
+use super::stringutils::StringUtils;
+
 /// Simple JSON config.
 pub struct Config {
     /// Cached config.
@@ -120,7 +122,8 @@ impl Config {
         path.push_str(self.path);
 
         if path.contains('/') {
-            path.push_str(&name.replace('/', "\\"));
+            unsafe { StringUtils::replace_zero_alloc(&mut path, b"/", b"\\") };
+            path.push_str(name);
         } else {
             path.push_str(name);
         }
