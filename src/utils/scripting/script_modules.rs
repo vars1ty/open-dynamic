@@ -325,7 +325,7 @@ impl SystemModules {
         WinUtils::find_from_signature(
             address_type,
             None,
-            &WinUtils::hex_string_to_bytes(hex_string)
+            &StringUtils::hex_string_to_bytes(hex_string)
                 .unwrap_or_crash(zencstr!("[ERROR] Failed converting hex string into bytes!")),
             true,
         )
@@ -416,7 +416,7 @@ impl SystemModules {
         // byte-string. Content goes inside 'b[]'.
         zencstr!("b[").use_string(|start_pfx| {
             if data_string.starts_with(&*start_pfx) && data_string.ends_with(']') {
-                if let Some(data_bytes) = WinUtils::hex_string_to_bytes(
+                if let Some(data_bytes) = StringUtils::hex_string_to_bytes(
                     data_string.replace(&*start_pfx, "").replace([']', ' '], ""),
                 ) {
                     bytes = data_bytes;
