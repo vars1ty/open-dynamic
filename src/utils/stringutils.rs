@@ -40,20 +40,11 @@ impl StringUtils {
 
         // Iterate over the string by two characters at a time
         for i in (0..hex_string.len()).step_by(2) {
-            // Parse two characters as a hexadecimal number
-            let byte = match u8::from_str_radix(&hex_string[i..i + 2], 16) {
-                Ok(b) => b,
-                Err(_) => {
-                    log!(
-                        "[ERROR] Failed parsing character at position ",
-                        i,
-                        " into a valid u8!"
-                    );
-                    return None;
-                }
+            // Parse two characters as a hexadecimal number. If successful, add the byte.
+            let Ok(byte) = u8::from_str_radix(&hex_string[i..i + 2], 16) else {
+                return None;
             };
 
-            // Push the parsed byte into the vector
             bytes.push(byte);
         }
 
