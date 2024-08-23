@@ -140,6 +140,9 @@ pub struct CrossCom {
     /// Network Listener instance, needed for sending server messages across the rest of the
     /// client, and for receiving them on other ends.
     network_listener: NetworkListener,
+
+    /// Decompressed data vector.
+    decompressed_data: RefCell<Vec<u8>>,
 }
 
 thread_safe_structs!(CrossCom);
@@ -162,6 +165,7 @@ impl CrossCom {
             server_endpoint: OnceLock::new(),
             handler: OnceLock::new(),
             network_listener: NetworkListener::new(),
+            decompressed_data: RefCell::new(Vec::with_capacity(512)),
         }
     }
 
@@ -200,9 +204,13 @@ impl CrossCom {
                 }
                 NetEvent::Accepted(..) => unreachable!(),
                 NetEvent::Message(_, data) => {
-                    if let Ok(server_data) =
-                        unsafe { rkyv::from_bytes_unchecked(&CompressionUtils::decompress(data)) }
-                    {
+                    if let Ok(server_data) = unsafe {
+                        CompressionUtils::decompress(
+                            data,
+                            &mut self.decompressed_data.borrow_mut(),
+                        );
+                        rkyv::from_bytes_unchecked(&self.decompressed_data.borrow())
+                    } {
                         self.handle_server_data(server_data);
                     }
                 }

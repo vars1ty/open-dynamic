@@ -17,17 +17,14 @@ impl CompressionUtils {
     }
 
     /// Decompresses the given bytes.
-    pub fn decompress(bytes: &[u8]) -> Vec<u8> {
-        let mut output = Vec::new();
+    pub fn decompress(bytes: &[u8], output: &mut Vec<u8>) {
         ZlibDecoder::new(bytes)
-            .read_to_end(&mut output)
+            .read_to_end(output)
             .unwrap_or_else(|error| {
                 crash!(
                     "[ERROR] Failed reading decompressed bytes to output, error: ",
                     error
                 )
             });
-
-        output
     }
 }
