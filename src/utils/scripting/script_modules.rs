@@ -34,6 +34,7 @@ pub struct SystemModules;
 
 impl SystemModules {
     /// Builds this module.
+    #[optimize(size)]
     pub fn build(
         base_core: Arc<RwLock<BaseCore>>,
         crosscom: Arc<RwLock<CrossCom>>,
@@ -532,6 +533,7 @@ pub struct UIModules;
 
 impl UIModules {
     /// Builds this module.
+    #[optimize(size)]
     pub fn build(custom_window_utils: &'static CustomWindowsUtils) -> Result<Module, ContextError> {
         let mut module = Module::with_crate(&zencstr!("ui").data)?; // <-- TODO: Rename to `UI`.
 

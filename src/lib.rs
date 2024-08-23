@@ -1,6 +1,6 @@
 #![feature(const_fn_floating_point_arithmetic)]
+#![feature(stmt_expr_attributes)]
 #![feature(optimize_attribute)]
-#![feature(c_variadic)]
 #[macro_use]
 extern crate smallvec;
 

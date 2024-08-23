@@ -357,6 +357,9 @@ impl ScriptCore {
 
     /// Adds a module to `cross_modules` which is a set of modules that have been added from
     /// outside of dynamic.
+    /// TODO: Implement a string identifier tied to the module which can be used to remove the
+    /// module.
+    /// Not removing a module after a plugin has been ejected results in crashes.
     pub fn add_rune_module(&self, module: Module) {
         self.cross_modules
             .try_lock()

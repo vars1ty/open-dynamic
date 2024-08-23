@@ -40,6 +40,7 @@ macro_rules! zencstr {
         $crate::zstring::ZString::new(encrypt_arg!($arg))
     };
     ($($arg:expr),*) => {
+        #[optimize(size)]
         {
             let mut output = $crate::zstring::ZString::default();
             $(
@@ -58,18 +59,21 @@ macro_rules! crash {
         $crate::winutils::WinUtils::display_message_box(&zencstr!("Error").data, &encrypt_arg!($arg), 0x00000010);
         $crate::winutils::WinUtils::sleep_and_exit(5)
     }};
-    ($($arg:expr),*) => {{
-        print!("{}", zencstr!("[", file!(), ":", line!(), "]: "));
-        let mut message = $crate::zstring::ZString::default();
-        $(
-            let arg_content = format!("{}", encrypt_arg!($arg));
-            print!("{arg_content}");
-            message.data += &arg_content;
-        )*
-        println!();
-        $crate::winutils::WinUtils::display_message_box(&zencstr!("Error").data, &message.data, 0x00000010);
-        $crate::winutils::WinUtils::sleep_and_exit(5)
-    }};
+    ($($arg:expr),*) => {
+        #[optimize(size)]
+        {
+            print!("{}", zencstr!("[", file!(), ":", line!(), "]: "));
+            let mut message = $crate::zstring::ZString::default();
+            $(
+                let arg_content = format!("{}", encrypt_arg!($arg));
+                print!("{arg_content}");
+                message.data += &arg_content;
+            )*
+            println!();
+            $crate::winutils::WinUtils::display_message_box(&zencstr!("Error").data, &message.data, 0x00000010);
+            $crate::winutils::WinUtils::sleep_and_exit(5)
+        }
+    };
 }
 
 /// Quicker way of defining macros, mainly intended as a C++-like replacement for #define.
