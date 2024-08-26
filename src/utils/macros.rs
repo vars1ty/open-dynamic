@@ -8,7 +8,6 @@ macro_rules! log {
         $crate::winutils::WinUtils::log_message(&mut zencstr!("[", file!(), ":", line!(), "]: ", $arg), true);
     };
     ($($arg:expr),*) => {
-        #[optimize(size)]
         {
             $crate::winutils::WinUtils::log_message(&mut zencstr!("[", file!(), ":", line!(), "]: "), false);
             $(
@@ -40,7 +39,6 @@ macro_rules! zencstr {
         $crate::zstring::ZString::new(encrypt_arg!($arg))
     };
     ($($arg:expr),*) => {
-        #[optimize(size)]
         {
             let mut output = $crate::zstring::ZString::default();
             $(
@@ -60,7 +58,6 @@ macro_rules! crash {
         $crate::winutils::WinUtils::sleep_and_exit(5)
     }};
     ($($arg:expr),*) => {
-        #[optimize(size)]
         {
             print!("{}", zencstr!("[", file!(), ":", line!(), "]: "));
             let mut message = $crate::zstring::ZString::default();

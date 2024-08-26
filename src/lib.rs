@@ -1,6 +1,7 @@
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(stmt_expr_attributes)]
 #![feature(optimize_attribute)]
+#![feature(c_variadic)]
 #[macro_use]
 extern crate smallvec;
 
@@ -47,7 +48,7 @@ use windows::Win32::{
 use zstring::ZString;
 
 /// Called when the DLL has been injected/detached.
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(non_snake_case, unused_variables)]
 extern "system" fn DllMain(
     dll_module: HINSTANCE,

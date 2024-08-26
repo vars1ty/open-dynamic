@@ -162,7 +162,7 @@ impl ScriptCore {
         let Some(mut compiled_scripts) = self.compiled_scripts.try_lock() else {
             log!("[ERROR] Compilation failed because Compiled Scripts is locked!");
             log!(
-                "Info: This is common if you are already running a script, as it has to complete before you can continue."
+                "[INFO] This is common if you are already running a script, as it has to complete before you can continue."
             );
             return;
         };

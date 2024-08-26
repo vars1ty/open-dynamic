@@ -273,7 +273,7 @@ impl WinUtils {
             0
         });
 
-        RuneDoubleResultPrimitive::new(value_i32, value_i64, value_i32 as f32, value_i64 as f64)
+        RuneDoubleResultPrimitive::new(value_i32 as i8, value_i32, value_i64, value_i32 as f32, value_i64 as f64)
     }
 
     /// Gets the address to a function inside of a module.

@@ -6,6 +6,7 @@ use crate::{
         crosscom::CrossCom,
         dynwidget::WidgetType,
         extensions::{F32Ext, OptionExt},
+        runedetour::RDetour,
         scripting::rune_ext_structs::RuneDoubleResultPrimitive,
         stringutils::StringUtils,
         ui::customwindows::CustomWindowsUtils,
@@ -14,7 +15,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use parking_lot::RwLock;
-use rune::{ContextError, Module, Value};
+use rune::{runtime::Function, ContextError, Module, Value};
 use std::{
     ffi::CString,
     fmt::{Debug, Display},
@@ -54,6 +55,7 @@ impl SystemModules {
         let mut fs_module = Module::with_crate(&zencstr!("FileSystem").data)?;
         let mut arctic_module = Module::with_crate(&zencstr!("Arctic").data)?;
         let mut utils_module = Module::with_crate(&zencstr!("Utils").data)?;
+        let mut std_module = Module::with_crate(&zencstr!("std").data)?;
 
         module.ty::<RuneDoubleResultPrimitive>()?;
 
@@ -164,6 +166,12 @@ impl SystemModules {
             })
             .build()?;
         memory_module
+            .function("hook_function", RDetour::install_detour_auto)
+            .build()?;
+        memory_module
+            .function("drop_hook", RDetour::drop_rdetour_at)
+            .build()?;
+        memory_module
             .function("value_as_ptr", |value: Value| {
                 ScriptCore::value_as_ptr(&value).map(|value| value as i64)
             })
@@ -244,6 +252,19 @@ impl SystemModules {
             })
             .build()?;
 
+        std_module.function("ftoi", |f: f32| f as i32).build()?;
+        std_module.function("dtoi", |f: f64| f as i32).build()?;
+
+        std_module.function("itos", |i: i32| i as i8).build()?;
+        std_module.function("itol", |i: i32| i as i64).build()?;
+        std_module.function("itof", |i: i32| i as f32).build()?;
+        std_module.function("itod", |i: i32| i as f64).build()?;
+
+        std_module.function("ltos", |l: i64| l as i8).build()?;
+        std_module.function("ltoi", |l: i64| l as i32).build()?;
+        std_module.function("ltof", |l: i64| l as f32).build()?;
+        std_module.function("ltod", |l: i64| l as f64).build()?;
+
         Ok(vec![
             module,
             dynamic_module,
@@ -258,6 +279,7 @@ impl SystemModules {
             config_module,
             fs_module,
             arctic_module,
+            std_module,
         ])
     }
 
@@ -443,11 +465,12 @@ impl SystemModules {
         }
 
         unsafe {
+            let read_i8: i8 = std::ptr::read(address as _);
             let read_i32: i32 = std::ptr::read(address as _);
             let read_i64: i64 = std::ptr::read(address as _);
             let read_f32: f32 = std::ptr::read(address as _);
             let read_f64: f64 = std::ptr::read(address as _);
-            RuneDoubleResultPrimitive::new(read_i32, read_i64, read_f32, read_f64)
+            RuneDoubleResultPrimitive::new(read_i8, read_i32, read_i64, read_f32, read_f64)
         }
     }
 
@@ -457,10 +480,10 @@ impl SystemModules {
         let cursor_pos = WinUtils::get_cursor_pos();
         let (x, y) = (cursor_pos.x, cursor_pos.y);
         vec.push(RuneDoubleResultPrimitive::new(
-            x, x as i64, x as f32, x as f64,
+            x as i8, x, x as i64, x as f32, x as f64,
         ));
         vec.push(RuneDoubleResultPrimitive::new(
-            y, y as i64, y as f32, y as f64,
+            y as i8, y, y as i64, y as f32, y as f64,
         ));
         vec
     }

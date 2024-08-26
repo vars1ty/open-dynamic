@@ -1,13 +1,5 @@
 use crate::utils::{
-    api::API,
-    config::Config,
-    crosscom::{CrossCom, CrossComState},
-    eguiutils::ImGuiUtils,
-    extensions::OptionExt,
-    prompter::Prompter,
-    scripting::{arctic::Arctic, script_core::ScriptCore},
-    stringutils::StringUtils,
-    ui::customwindows::CustomWindowsUtils,
+    api::API, config::Config, crosscom::{CrossCom, CrossComState}, eguiutils::ImGuiUtils, extensions::OptionExt, prompter::Prompter, runedetour::RDetour, scripting::{arctic::Arctic, script_core::ScriptCore}, stringutils::StringUtils, ui::customwindows::CustomWindowsUtils
 };
 use parking_lot::RwLock;
 use std::sync::{Arc, LazyLock, OnceLock};
@@ -47,6 +39,7 @@ impl BaseCore {
                 .unwrap_or_crash(zencstr!("[ERROR] Missing primary NDNX/INTERNAL serial!"))
                 .to_owned(),
         ));
+        RDetour::register_all_detours();
 
         Self {
             config,

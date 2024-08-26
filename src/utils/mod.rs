@@ -14,3 +14,4 @@ pub mod scripting;
 pub mod stringutils;
 pub mod types;
 pub mod ui;
+pub mod runedetour;
