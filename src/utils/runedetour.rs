@@ -1,10 +1,8 @@
+use crate::utils::extensions::OptionExt;
 use parking_lot::RwLock;
 use retour::RawDetour;
 use rune::runtime::{Function, SyncFunction};
-use serde::de;
 use std::sync::{Arc, OnceLock};
-
-use crate::utils::extensions::OptionExt;
 
 /// Generates code for the unique ID tied to the calling function, and collects 10 arguments from
 /// `args` into `args_out`.
@@ -49,14 +47,10 @@ pub struct RDetour {
     /// The ID of the detour.
     detour_id: u8,
 
-    /// The pointer of which function will be treated as target, and will be redirected to
-    /// `to_ptr`.
+    /// The pointer of which function will be treated as target, and will be redirected to a
+    /// determined detour holder from `determine_detour_holder()`.
     /// If `None`, this detour isn't ready to be used and is free to be acquired.
     from_ptr: Option<i64>,
-
-    /// The pointer of which function will be used as the new callback for `from_ptr`.
-    /// If `None`, this detour isn't ready to be used and is free to be acquired.
-    to_ptr: Option<i64>,
 
     /// The `RawDetour` instance.
     /// If `None`, this detour isn't ready to be used and is free to be acquired.
@@ -83,6 +77,9 @@ impl RDetour {
             detour_holder_08();
             detour_holder_09();
         }
+
+        #[cfg(target_pointer_width = "32")]
+        log!("[WARN] RDetours ready, note that 32-bit is more unstable with c_variadic-forced hooks!");
     }
 
     /// Registers a new detour at ID `detour_id - 1` in `RUNE_DETOURS`.
@@ -118,7 +115,6 @@ impl RDetour {
                 ..Default::default()
             })),
         );
-        log!("[RDetour] RDetour at ID ", detour_id, " is ready!");
     }
 
     /// Automatically finds the first-available `RDetour` and installs it on `from_ptr` with the
@@ -176,10 +172,9 @@ impl RDetour {
         let to_ptr = self.determine_detour_holder();
         self.rune_function = Some(rune_function);
         self.from_ptr = Some(from_ptr);
-        self.to_ptr = Some(to_ptr as i64);
 
         unsafe {
-            let hook = Self::create_hook(from_ptr as *const i64, to_ptr);
+            let hook = Self::create_hook(from_ptr as *const (), to_ptr);
             hook.enable().unwrap_or_else(|error| {
                 crash!(
                     "[ERROR] Failed enabling detour on ID ",
@@ -212,7 +207,7 @@ impl RDetour {
 
         let Some(rdetour) = rdetour.try_read() else {
             log!(
-                "[ERROR] Detour at ID ",
+                "[ERROR] RDetour at ID ",
                 detour_id,
                 " is locked, cannot call Rune function!"
             );
@@ -249,20 +244,20 @@ impl RDetour {
 
     /// Determines the `detour_holder_xx` function based on `self.get_detour_id()` and returns it
     /// as a pointer.
-    fn determine_detour_holder(&self) -> *const i64 {
+    fn determine_detour_holder(&self) -> *const () {
         match self.get_detour_id() {
-            0 => detour_holder_00 as *const i64,
-            1 => detour_holder_01 as *const i64,
-            2 => detour_holder_02 as *const i64,
-            3 => detour_holder_03 as *const i64,
-            4 => detour_holder_04 as *const i64,
-            5 => detour_holder_05 as *const i64,
-            6 => detour_holder_06 as *const i64,
-            7 => detour_holder_07 as *const i64,
-            8 => detour_holder_08 as *const i64,
-            9 => detour_holder_09 as *const i64,
+            0 => detour_holder_00 as *const (),
+            1 => detour_holder_01 as *const (),
+            2 => detour_holder_02 as *const (),
+            3 => detour_holder_03 as *const (),
+            4 => detour_holder_04 as *const (),
+            5 => detour_holder_05 as *const (),
+            6 => detour_holder_06 as *const (),
+            7 => detour_holder_07 as *const (),
+            8 => detour_holder_08 as *const (),
+            9 => detour_holder_09 as *const (),
             _ => crash!(
-                "[ERROR] Detour ID ",
+                "[ERROR] RDetour ID ",
                 self.get_detour_id(),
                 " doesn't have any reserved function for it!"
             ),
@@ -272,16 +267,17 @@ impl RDetour {
     /// Creates a new hook from a pointer, to another.
     /// The inner function is always redirected into a c_variadic function to grab the arguments.
     /// This may cause UB and should be used with **extreme** care!
-    fn create_hook(from: *const i64, to: *const i64) -> Box<RawDetour> {
+    fn create_hook(from: *const (), to: *const ()) -> Box<RawDetour> {
         unsafe {
-            let hook = RawDetour::new(from as _, to as _).unwrap_or_else(|error| crash!(error));
+            let hook = RawDetour::new(from, to).unwrap_or_else(|error| crash!(error));
             hook.enable().unwrap_or_else(|error| crash!(error));
             Box::new(hook)
         }
     }
 
-    /// Drops a detour from
+    /// Drops a detour from `address` if there's any installed RDetours at that address.
     pub fn drop_rdetour_at(address: i64) {
+        let address = address as *const i64;
         let Some(rune_detours) = RUNE_DETOURS.try_read() else {
             log!("[ERROR] rune_detours is locked, cannot access RDetours!");
             return;
@@ -292,16 +288,16 @@ impl RDetour {
                 .try_read()
                 .unwrap_or_crash(zencstr!(
                     "[ERROR] RDetour at address ",
-                    format!("{:?}", address as *const i64),
+                    format!("{address:?}"),
                     " is locked and cannot be modified!"
                 ))
                 .get_from_address()
                 .unwrap_or_default()
-                == address
+                == address as i64
         }) else {
             log!(
                 "[ERROR] No RDetour has been installed at ",
-                format!("{:?}", address as *const i64)
+                format!("{address:?}")
             );
             return;
         };
@@ -309,13 +305,12 @@ impl RDetour {
         let Some(mut rdetour) = rdetour.try_write() else {
             log!(
                 "[ERROR] RDetour at ",
-                format!("{:?}", address as *const i64),
+                format!("{address:?}"),
                 " is locked and cannot be modified!"
             );
             return;
         };
 
-        let address = address as *const i64;
         let Some(detour) = rdetour.detour.take() else {
             log!(
                 "[ERROR] Couldn't obtain RawDetour from ID ",
@@ -341,9 +336,8 @@ impl RDetour {
             }
         }
 
-        rdetour.rune_function = None;
         rdetour.from_ptr = None;
-        rdetour.to_ptr = None;
+        drop(rdetour.rune_function.take());
         drop(detour);
         log!(
             "[RDetour] RDetour at ID ",
@@ -377,7 +371,7 @@ impl RDetour {
     /// Returns `true` if this detour has been acquired, `false` if it hasn't.
     /// If it has, it is **not** available for `install_detour*`.
     const fn is_detour_acquired(&self) -> bool {
-        self.from_ptr.is_some() || self.to_ptr.is_some() || self.detour.is_some()
+        self.from_ptr.is_some() || self.detour.is_some()
     }
 }
 

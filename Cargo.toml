@@ -2,7 +2,7 @@ cargo-features = ["edition2024"]
 
 [package]
 name = "dynamic"
-version = "6.2.0-release"
+version = "6.3.0-release"
 edition = "2024"
 
 [lib]
@@ -26,17 +26,15 @@ dll-syringe = "0.15.2"
 magic-crypt = "3.1.13"
 message-io = "0.18.1"
 serde = "1.0.204"
-minhook = "0.5.0"
 obfstr = "0.4.3"
 image = "0.24.9"
 rkyv = "0.7.44"
 rune = "0.13.4"
 
 [profile.release]
-overflow-checks = true
 incremental = true
 codegen-units = 1
 panic = "abort"
-opt-level = 0
+opt-level = 3
 strip = true
 lto = "fat"
