@@ -46,15 +46,12 @@ impl SystemModules {
         let mut compiler_module = Module::with_crate(&zencstr!("Compiler").data)?;
         let mut task_module = Module::with_crate(&zencstr!("Task").data)?;
         let mut parse_module = Module::with_crate(&zencstr!("Parse").data)?;
-        let mut convert_module = Module::with_crate(&zencstr!("Convert").data)?;
         let mut math_module = Module::with_crate(&zencstr!("Math").data)?;
         let mut windows_module = Module::with_crate(&zencstr!("Windows").data)?;
         let mut memory_module = Module::with_crate(&zencstr!("Memory").data)?;
         let mut sellix_module = Module::with_crate(&zencstr!("Sellix").data)?;
         let mut config_module = Module::with_crate(&zencstr!("Config").data)?;
-        let mut fs_module = Module::with_crate(&zencstr!("FileSystem").data)?;
         let mut arctic_module = Module::with_crate(&zencstr!("Arctic").data)?;
-        let mut utils_module = Module::with_crate(&zencstr!("Utils").data)?;
         let mut std_module = Module::with_crate(&zencstr!("std").data)?;
 
         module.ty::<RuneDoubleResultPrimitive>()?;
@@ -63,9 +60,6 @@ impl SystemModules {
             .function("log", |data: String| {
                 log!(data);
             })
-            .build()?;
-        dynamic_module
-            .function("get_random_string", StringUtils::get_random)
             .build()?;
         dynamic_module
             .function("create_thread_key", Self::create_thread_key)
@@ -102,9 +96,6 @@ impl SystemModules {
         parse_module.function("bool", Self::r#as::<bool>).build()?;
         parse_module
             .function("hex_to_primitive", WinUtils::hex_to_primitive)
-            .build()?;
-        convert_module
-            .function("f32_to_string", |value: f32| value.to_string())
             .build()?;
         math_module
             .function("sin", |value: f32| value.sin())
@@ -172,11 +163,6 @@ impl SystemModules {
             .function("drop_hook", RDetour::drop_rdetour_at)
             .build()?;
         memory_module
-            .function("value_as_ptr", |value: Value| {
-                ScriptCore::value_as_ptr(&value).map(|value| value as i64)
-            })
-            .build()?;
-        memory_module
             .function("free_cstring", |ptr: i64| {
                 drop(unsafe { CString::from_raw(ptr as _) });
             })
@@ -208,11 +194,6 @@ impl SystemModules {
                 serials.contains(&serial)
             })
             .build()?;
-        fs_module
-            .function("read", |path: String| {
-                std::fs::read_to_string(path).unwrap_or_default()
-            })
-            .build()?;
 
         let base_core_clone = Arc::clone(&base_core);
         arctic_module
@@ -242,7 +223,7 @@ impl SystemModules {
             })
             .build()?;
 
-        utils_module
+        std_module
             .function("get_lines_from_string", |input: String| {
                 let lines = input
                     .lines()
@@ -250,6 +231,22 @@ impl SystemModules {
                     .collect::<Vec<_>>();
                 lines
             })
+            .build()?;
+
+        std_module
+            .function("read_file", |path: String| {
+                std::fs::read_to_string(path).unwrap_or_default()
+            })
+            .build()?;
+
+        std_module
+            .function("value_as_ptr", |value: Value| {
+                ScriptCore::value_as_ptr(&value).map(|value| value as i64)
+            })
+            .build()?;
+
+        std_module
+            .function("get_random_string", StringUtils::get_random)
             .build()?;
 
         std_module.function("ftoi", |f: f32| f as i32).build()?;
@@ -271,13 +268,11 @@ impl SystemModules {
             compiler_module,
             task_module,
             parse_module,
-            convert_module,
             math_module,
             windows_module,
             memory_module,
             sellix_module,
             config_module,
-            fs_module,
             arctic_module,
             std_module,
         ])
@@ -286,25 +281,7 @@ impl SystemModules {
     /// Runs a defined function on a new thread. This is especially useful when the user doesn't
     /// want to block the main thread, or the already newly-created thread from the special
     /// compiler option.
-    fn run_multi_threaded(function: Value, arg1: Option<Value>) {
-        let function_result = function.into_function().into_result();
-        let Ok(function) = function_result else {
-            log!(
-                "[ERROR] Non-function passed, error: ",
-                function_result.unwrap_err()
-            );
-            return;
-        };
-
-        let take_function = function.take();
-        let Ok(function) = take_function else {
-            log!(
-                "[ERROR] Failed taking function, error: ",
-                take_function.unwrap_err()
-            );
-            return;
-        };
-
+    fn run_multi_threaded(function: Function, arg1: Option<Value>) {
         let arg1 = arg1.map(ValueWrapper);
         let function = function.into_sync().into_result().unwrap_or_else(|error| {
             crash!(
@@ -312,6 +289,7 @@ impl SystemModules {
                 error
             )
         });
+
         std::thread::spawn(move || {
             let Err(error) = function
                 .call::<_, ()>((arg1.map(|value| value.0),))
@@ -426,7 +404,7 @@ impl SystemModules {
 
         let Ok(data_string) = data_string.borrow_ref() else {
             log!("[ERROR] Invalid type to be written!");
-            log!("Info: You may only use primitive values, strings and byte-strings!");
+            log!("[INFO] You may only use primitive values, strings and byte-strings!");
             return;
         };
 

@@ -10,7 +10,6 @@ use crate::{
 use ahash::AHashMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{
-    runtime::VmExecution,
     termcolor::{ColorChoice, StandardStream},
     *,
 };
@@ -234,27 +233,30 @@ impl ScriptCore {
     ) {
         let compiled_scripts = Arc::clone(&self.compiled_scripts);
         let code = move || {
-            let mut compiled_scripts = compiled_scripts.try_lock();
+            let compiled_scripts = compiled_scripts.try_lock();
             let Some(vm) = compiled_scripts
-                .as_mut()
-                .and_then(|compiled_scripts| compiled_scripts.get_mut(&source.get_hash()))
+                .as_ref()
+                .and_then(|compiled_scripts| compiled_scripts.get(&source.get_hash()))
             else {
                 return;
             };
 
-            if let Err(error) = vm.vm.lookup_function(["main"]) {
+            let main = vm.vm.lookup_function(["main"]);
+            if let Err(error) = main {
                 log!("[ERROR] Compile error when looking up main, error: ", error);
                 return;
             };
 
-            let execution = vm.vm.execute(["main"], ());
-            let Ok(mut execution) = execution else {
-                log!("[ERROR] Compile error when executing main!");
+            drop(compiled_scripts);
+            log!("[Script Engine] Script executing...");
+            let execution = main.unwrap().call::<(), ()>(()).into_result();
+            if let Err(error) = execution {
+                log!("[ERROR] Compile error when executing main, error: ", error);
                 return;
             };
 
             // Notify that the script is executing.
-            log!("[Script Engine] Script executing...");
+            log!("[Script Engine] Script finished executing!");
 
             // Send to party.
             if send_src_to_network {
@@ -262,10 +264,6 @@ impl ScriptCore {
                     reader.send_script(&source);
                 }
             }
-
-            // Execute the script and wait for its completion asynchronously.
-            Self::spawn_execution(&mut execution);
-            drop(compiled_scripts);
         };
 
         if use_new_thread {
@@ -277,16 +275,6 @@ impl ScriptCore {
         }
 
         code();
-    }
-
-    /// Completes a `VmSendExecution` asynchronously.
-    fn spawn_execution(execution: &mut VmExecution<&mut Vm>) {
-        let Err(error) = execution.complete().into_result() else {
-            log!("[Script Engine] Script finished executing!");
-            return;
-        };
-
-        log!("[ERROR] Compile error when executing main, error: ", error);
     }
 
     /// Adds referenced imports to the initial script, then returns the result.
