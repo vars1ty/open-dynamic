@@ -584,10 +584,15 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_button", move |identifier, text, function| {
-                custom_window_utils
-                    .add_widget(identifier, WidgetType::Button(text, Rc::new(function)))
-            })
+            .function(
+                "add_button",
+                move |identifier, text, function, opt_param| {
+                    custom_window_utils.add_widget(
+                        identifier,
+                        WidgetType::Button(text, Rc::new(function), opt_param),
+                    )
+                },
+            )
             .build()?;
 
         module

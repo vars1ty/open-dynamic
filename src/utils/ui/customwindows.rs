@@ -5,7 +5,7 @@ use ahash::AHashMap;
 use hudhook::imgui::{self, Condition, TextureId};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use rune::Any;
+use rune::{Any, Value};
 use smallvec::SmallVec;
 use std::{
     cell::{Cell, RefCell},
@@ -230,12 +230,15 @@ impl CustomWindowsUtils {
                 label!(ui, content);
                 font_token.pop();
             }
-            WidgetType::Button(text, function) => {
+            WidgetType::Button(text, function, opt_param) => {
                 if !button!(ui, text) {
                     return;
                 };
 
-                if let Err(error) = function.call::<(), ()>(()).into_result() {
+                if let Err(error) = function
+                    .call::<(Option<&Value>,), ()>((opt_param.as_ref(),))
+                    .into_result()
+                {
                     log!(
                         "[ERROR] Failed calling button function on \"",
                         identifier,
