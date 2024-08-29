@@ -1,4 +1,5 @@
 use crate::{
+    globals::DELTA_TIME,
     mod_cores::base_core::BaseCore,
     ui::community::CommunityWindow,
     utils::{eguiutils::ImGuiUtils, extensions::OptionExt},
@@ -263,6 +264,7 @@ impl ImguiRenderLoop for DX11UI {
 
     /// Renders the UI.
     fn render(&mut self, ui: &mut imgui::Ui) {
+        DELTA_TIME.store(ui.io().delta_time, Ordering::SeqCst);
         let base_core = Arc::clone(&self.base_core);
         let Some(base_core_reader) = base_core.try_read() else {
             return;

@@ -25,7 +25,7 @@ use std::{
     fmt::{Debug, Display},
     rc::Rc,
     str::FromStr,
-    sync::Arc,
+    sync::{atomic::Ordering, Arc},
 };
 use windows::Win32::System::{Console::AllocConsole, Threading::GetCurrentProcess};
 use wmem::Memory;
@@ -75,7 +75,7 @@ impl SystemModules {
             .function("is_key_down", WinUtils::is_key_down)
             .build()?;
         dynamic_module
-            .function("get_delta_time", || unsafe { DELTA_TIME })
+            .function("get_delta_time", || DELTA_TIME.load(Ordering::SeqCst))
             .build()?;
         compiler_module
             .function("run_multi_threaded", Self::run_multi_threaded)

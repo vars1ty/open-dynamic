@@ -14,7 +14,7 @@ use rune::Module;
 use std::{
     collections::HashMap,
     os::windows::io::FromRawHandle,
-    sync::{Arc, OnceLock},
+    sync::{atomic::Ordering, Arc, OnceLock},
 };
 use windows::Win32::System::Threading::GetCurrentProcess;
 
@@ -198,7 +198,7 @@ impl Arctic {
                         log!(data);
                     },
                     memory_read_string: SystemModules::read_string,
-                    dynamic_get_delta_time: || unsafe { DELTA_TIME },
+                    dynamic_get_delta_time: || DELTA_TIME.load(Ordering::SeqCst),
                     dynamic_eject_payload: Box::new(move |owned_process, payload| {
                         Self::eject_payload(owned_process, payload, Arc::clone(&injected_dlls))
                     }),
