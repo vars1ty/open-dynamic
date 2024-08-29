@@ -24,6 +24,7 @@ thread_safe_structs!(SafeMODULEENTRY32);
 pub static MODULES: OnceLock<AHashMap<String, SafeMODULEENTRY32>> = OnceLock::new();
 
 // Keys that should be used with loops in scripts. If a value is false, the loop should stop.
+#[deprecated = "This shouldn't be static, it should be moved to ScriptCore."]
 pub static SCRIPTING_THREAD_KEYS: OnceLock<RwLock<AHashMap<String, bool>>> = OnceLock::new();
 
 /// Logged screen (and stdout) messages.
