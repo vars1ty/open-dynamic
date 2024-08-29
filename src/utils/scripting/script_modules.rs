@@ -705,7 +705,7 @@ impl UIModules {
             .function(
                 "replace_image",
                 move |identifier, new_image_path, width, height| {
-                    custom_window_utils.replace_image(identifier, new_image_path, width, height)
+                    custom_window_utils.replace_image(identifier, new_image_path, [width, height])
                 },
             )
             .build()?;

@@ -6,19 +6,15 @@ use hudhook::imgui::{self, Condition, TextureId};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{Any, Value};
-use smallvec::SmallVec;
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
     rc::Rc,
     sync::Arc,
 };
 use windows::Win32::Foundation::POINT;
 use zstring::ZString;
 
-/// Aliased type for a widgets `RefCell` with an `IndexMap` which hold all of the widgets for a
-/// certain window.
-type WidgetsMap = RefCell<IndexMap<String, Rc<WidgetType>>>;
+type WidgetsMap = IndexMap<String, Rc<RefCell<WidgetType>>>;
 
 /// Technical data about a custom window.
 #[derive(Default, Any, Clone, Copy)]
@@ -59,36 +55,36 @@ pub struct WindowData {
 #[derive(Default)]
 pub struct CustomWindowsUtils {
     /// Titles for each custom window.
-    window_titles: Mutex<Vec<String>>,
+    window_titles: RwLock<Vec<String>>,
 
     /// Widgets for each window.
     #[allow(clippy::type_complexity)] // Ignore because it's complex.
-    window_widgets: Mutex<SmallVec<[WidgetsMap; 3]>>,
+    window_widgets: RefCell<Vec<RefCell<WidgetsMap>>>,
 
     /// Current window index to be used for modifications.
     current_window_index: Cell<usize>,
 
     /// Window size constraints.
-    window_size_constraints: Mutex<SmallVec<[[f32; 4]; 3]>>,
+    window_size_constraints: Mutex<Vec<[f32; 4]>>,
 
     /// Cached GPU TextureIds, key being the path to the image.
-    cached_images: Mutex<AHashMap<String, Option<TextureId>>>,
+    cached_images: RefCell<AHashMap<String, Option<TextureId>>>,
 
     /// Technical data about all custom windows.
-    window_data: RefCell<HashMap<usize, WindowData>>,
+    window_data: RefCell<Vec<WindowData>>,
 
     /// Current cursor point.
     point: Cell<POINT>,
 
     /// Widgets that should remain hidden.
-    hidden_widgets: Mutex<SmallVec<[String; 4]>>,
+    hidden_widgets: Mutex<Vec<String>>,
 
     /// If `Some(String)`, all widgets that get added next will be added into the defined centered
     /// widget parent/holder.
     add_into_centered: RefCell<Option<String>>,
 
     /// Pending scripts to be executed on the next UI draw call.
-    pending_scripts: Mutex<Option<Vec<String>>>,
+    pending_scripts: RefCell<Option<Vec<String>>>,
 }
 
 thread_safe_structs!(CustomWindowsUtils);
@@ -96,7 +92,7 @@ thread_safe_structs!(CustomWindowsUtils);
 impl CustomWindowsUtils {
     /// Executes Rune code, intended for custom windows.
     fn execute_rune_code(&self, rune_code: &str) {
-        let Some(mut pending_scripts) = self.pending_scripts.try_lock() else {
+        let Ok(mut pending_scripts) = self.pending_scripts.try_borrow_mut() else {
             return;
         };
 
@@ -113,7 +109,7 @@ impl CustomWindowsUtils {
 
     /// Draws all of the custom windows.
     pub fn draw_custom_windows(&self, ui: &imgui::Ui, base_core: Arc<RwLock<BaseCore>>) {
-        let Some(window_titles) = self.window_titles.try_lock() else {
+        let Some(window_titles) = self.window_titles.try_read() else {
             return;
         };
 
@@ -124,7 +120,7 @@ impl CustomWindowsUtils {
         static DEFAULT_SIZE: [f32; 2] = [600.0, 200.0];
 
         for (index, custom_window) in window_titles.iter().enumerate() {
-            let Some(window_widgets) = self.window_widgets.try_lock() else {
+            let Ok(window_widgets) = self.window_widgets.try_borrow() else {
                 continue;
             };
 
@@ -162,12 +158,15 @@ impl CustomWindowsUtils {
     fn draw_custom_window(
         &self,
         base_core: Arc<RwLock<BaseCore>>,
-        widgets: &RefCell<IndexMap<String, Rc<WidgetType>>>,
+        widgets: &RefCell<WidgetsMap>,
         ui: &imgui::Ui,
         window_index: usize,
     ) {
-        let mut widgets = widgets.borrow_mut();
-        for (identifier, widget) in &mut *widgets {
+        let Some(widgets) = widgets.try_borrow().ok() else {
+            return;
+        };
+
+        for (identifier, widget) in &*widgets {
             let Some(hidden_widgets) = self.hidden_widgets.try_lock() else {
                 continue;
             };
@@ -177,7 +176,6 @@ impl CustomWindowsUtils {
             }
 
             drop(hidden_widgets);
-            let widget = Rc::make_mut(widget);
             self.handle_widget(Arc::clone(&base_core), ui, identifier, widget, window_index);
         }
     }
@@ -188,10 +186,14 @@ impl CustomWindowsUtils {
         base_core: Arc<RwLock<BaseCore>>,
         ui: &imgui::Ui,
         identifier: &str,
-        widget: &mut WidgetType,
+        widget: &RefCell<WidgetType>,
         window_index: usize,
     ) {
-        match widget {
+        let Ok(mut widget) = widget.try_borrow_mut() else {
+            return;
+        };
+
+        match &mut *widget {
             WidgetType::Label(content, font_id) => {
                 let Some(font_token) = ImGuiUtils::activate_font(ui, *font_id) else {
                     log!(
@@ -354,9 +356,12 @@ impl CustomWindowsUtils {
 
     /// Changes the currently selected window.
     pub fn set_current_window_to(&self, window: String) {
-        let Some((index, _)) = self
-            .window_titles
-            .lock()
+        let Some(window_titles) = self.window_titles.try_read() else {
+            log!("[ERROR] window_titles is locked, cannot swap window focus!");
+            return;
+        };
+
+        let Some((index, _)) = window_titles
             .iter()
             .enumerate()
             .find(|(_, window_title)| **window_title == window)
@@ -369,7 +374,7 @@ impl CustomWindowsUtils {
 
     /// Adds a new custom window.
     pub fn add_window(&self, title: String) {
-        let Some(mut window_titles) = self.window_titles.try_lock() else {
+        let Some(mut window_titles) = self.window_titles.try_write() else {
             return;
         };
 
@@ -377,13 +382,13 @@ impl CustomWindowsUtils {
             return;
         };
 
-        let Some(mut window_widgets) = self.window_widgets.try_lock() else {
+        let Ok(mut window_widgets) = self.window_widgets.try_borrow_mut() else {
             return;
         };
 
         if window_titles.contains(&title) {
             log!(
-                "Warning: There's already a window with the name of \"",
+                "[WARN] There's already a window with the name of \"",
                 title,
                 "\"!"
             );
@@ -397,11 +402,11 @@ impl CustomWindowsUtils {
 
     /// Attempts to remove a custom window.
     pub fn remove_window(&self, title: String) {
-        let Some(mut window_titles) = self.window_titles.try_lock() else {
+        let Some(mut window_titles) = self.window_titles.try_write() else {
             return;
         };
 
-        let Some(mut window_widgets) = self.window_widgets.try_lock() else {
+        let Ok(mut window_widgets) = self.window_widgets.try_borrow_mut() else {
             return;
         };
 
@@ -425,16 +430,16 @@ impl CustomWindowsUtils {
         window_widgets.remove(index);
         window_titles.remove(index);
         window_size_constraints.remove(index);
-        self.window_data.borrow_mut().remove(&index);
+        self.window_data.borrow_mut().remove(index);
 
         if self.current_window_index.get() == index {
-            self.current_window_index.set(window_titles.len());
+            self.current_window_index.set(0);
         }
     }
 
     /// Attempts to rename a custom window.
     pub fn rename_window(&self, from: String, to: String) {
-        let Some(mut window_titles) = self.window_titles.try_lock() else {
+        let Some(mut window_titles) = self.window_titles.try_write() else {
             return;
         };
 
@@ -450,7 +455,7 @@ impl CustomWindowsUtils {
             log!(
                 "[ERROR] There's already a window with the name of \"",
                 to,
-                "\", can't rename window to the name of a pre-existing window!"
+                "\", can't rename window to the name of an already-existing window!"
             );
             return;
         }
@@ -479,7 +484,7 @@ impl CustomWindowsUtils {
             return;
         }
 
-        let window_widgets = self.window_widgets.try_lock();
+        let window_widgets = self.window_widgets.try_borrow().ok();
         let Some(window_widgets) = window_widgets
             .as_ref()
             .and_then(|window_widgets| window_widgets.get(self.current_window_index.get()))
@@ -489,7 +494,7 @@ impl CustomWindowsUtils {
 
         window_widgets
             .borrow_mut()
-            .insert(identifier, Rc::new(widget_type));
+            .insert(identifier, Rc::new(RefCell::new(widget_type)));
     }
 
     /// Adds a widget to a centered widget holder/parent.
@@ -499,21 +504,21 @@ impl CustomWindowsUtils {
         identifier: String,
         widget_type: WidgetType,
     ) {
-        let Some(window_widgets) = self.window_widgets.try_lock() else {
+        let Ok(window_widgets) = self.window_widgets.try_borrow() else {
             return;
         };
 
         for widget_map in &*window_widgets {
-            let mut widget_map = widget_map.borrow_mut();
+            let widget_map = widget_map.borrow();
             let Some((_, widget)) = widget_map
-                .iter_mut()
+                .iter()
                 .find(|(widget_identifier, _)| *widget_identifier == parent_identifier)
             else {
                 continue;
             };
 
             let WidgetType::CenteredWidgets(widgets, _custom_y, _group_size) =
-                &mut *Rc::make_mut(widget)
+                &mut *widget.borrow_mut()
             else {
                 continue;
             };
@@ -525,14 +530,14 @@ impl CustomWindowsUtils {
                 return;
             }
 
-            widgets.insert(identifier, Rc::new(widget_type));
+            widgets.insert(identifier, Rc::new(RefCell::new(widget_type)));
             return;
         }
     }
 
     /// Removes a widget from the currently selected custom window.
     pub fn remove_widget(&self, identifier: String) {
-        let window_widgets = self.window_widgets.try_lock();
+        let window_widgets = self.window_widgets.try_borrow().ok();
         let Some(window_widgets) = window_widgets
             .as_ref()
             .and_then(|window_widgets| window_widgets.get(self.current_window_index.get()))
@@ -542,8 +547,11 @@ impl CustomWindowsUtils {
 
         let mut window_widgets = window_widgets.borrow_mut();
         window_widgets.shift_remove(&identifier);
+
+        // Search through all widgets for all CenteredWidgets, then try and remove all instances of
+        // `identifier`.
         for widget in window_widgets.values_mut() {
-            if let WidgetType::CenteredWidgets(widgets, _, _) = &mut Rc::make_mut(widget) {
+            if let WidgetType::CenteredWidgets(widgets, _, _) = &mut *widget.borrow_mut() {
                 widgets.shift_remove(&identifier);
             }
         }
@@ -551,7 +559,7 @@ impl CustomWindowsUtils {
 
     /// Removes all widgets from the currently selected window.
     pub fn remove_all_widgets(&self) {
-        let window_widgets = self.window_widgets.try_lock();
+        let window_widgets = self.window_widgets.try_borrow().ok();
         let Some(window_widgets) = window_widgets
             .as_ref()
             .and_then(|window_widgets| window_widgets.get(self.current_window_index.get()))
@@ -563,11 +571,15 @@ impl CustomWindowsUtils {
     }
 
     /// Gets a widget from a specific window.
-    pub fn get_widget(&self, identifier: &str) -> Option<Rc<WidgetType>> {
-        let window_widgets = self.window_widgets.try_lock()?;
+    pub fn get_widget(&self, identifier: &str) -> Option<Rc<RefCell<WidgetType>>> {
+        let Ok(window_widgets) = self.window_widgets.try_borrow() else {
+            log!("[ERROR] window_widgets is locked, cannot use get_widget()!");
+            return None;
+        };
+
         let window_widgets = window_widgets.get(self.current_window_index.get())?;
         for (widget_identifier, widget) in &*window_widgets.borrow() {
-            // If widget was found outside of a CenteredWidget widget, return it.
+            // If widget was found outside of a `CenteredWidget` widget, return it.
             if widget_identifier == identifier {
                 return Some(Rc::clone(widget));
             }
@@ -576,7 +588,7 @@ impl CustomWindowsUtils {
             // it. If found, return it.
             // This won't work with nested CenteredWidgets, but that's frowned upon and
             // shouldn't be accounted for regardless.
-            let WidgetType::CenteredWidgets(widgets, _, _) = &**widget else {
+            let WidgetType::CenteredWidgets(widgets, _, _) = &*widget.borrow() else {
                 continue;
             };
 
@@ -601,7 +613,7 @@ impl CustomWindowsUtils {
             return 0.0;
         };
 
-        let WidgetType::F32Slider(_, _, _, current_value) = *widget else {
+        let WidgetType::F32Slider(_, _, _, current_value) = *widget.borrow() else {
             log!(
                 "[ERROR] Couldn't find any f32-sliders with the name of \"",
                 identifier,
@@ -624,7 +636,7 @@ impl CustomWindowsUtils {
             return 0;
         };
 
-        let WidgetType::I32Slider(_, _, _, current_value) = *widget else {
+        let WidgetType::I32Slider(_, _, _, current_value) = *widget.borrow() else {
             log!(
                 "[ERROR] Couldn't find any i32-sliders with the name of \"",
                 identifier,
@@ -647,7 +659,7 @@ impl CustomWindowsUtils {
             return String::default();
         };
 
-        let WidgetType::InputTextMultiLine(_, input, _, _) = &*widget else {
+        let WidgetType::InputTextMultiLine(_, input, _, _) = &*widget.borrow() else {
             log!(
                 "[ERROR] Couldn't find any multiline text input fields with the name of \"",
                 identifier,
@@ -675,29 +687,28 @@ impl CustomWindowsUtils {
         &self,
         identifier: String,
         new_image_path: String,
-        new_width: f32,
-        new_height: f32,
+        width_height: [f32; 2],
     ) {
-        let Some(window_widgets) = self.window_widgets.try_lock() else {
+        let Ok(window_widgets) = self.window_widgets.try_borrow() else {
             return;
         };
 
         for widget_map in &*window_widgets {
-            let mut widget_map = widget_map.borrow_mut();
+            let widget_map = widget_map.borrow();
             let Some((_, widget_type)) = widget_map
-                .iter_mut()
+                .iter()
                 .find(|(widget_identifier, _)| **widget_identifier == identifier)
             else {
                 continue;
             };
 
-            let widget_type = Rc::make_mut(widget_type);
+            let mut widget_type = widget_type.borrow_mut();
             if let WidgetType::Image(image_path, width, height, _overlay, _background, _rune_code) =
                 &mut *widget_type
             {
                 *image_path = new_image_path;
-                *width = new_width;
-                *height = new_height;
+                *width = width_height[0];
+                *height = width_height[1];
                 return;
             }
         }
@@ -705,7 +716,7 @@ impl CustomWindowsUtils {
 
     /// Clears all cached images.
     pub fn clear_cached_images(&self) {
-        let Some(mut cached_images) = self.cached_images.try_lock() else {
+        let Ok(mut cached_images) = self.cached_images.try_borrow_mut() else {
             return;
         };
 
@@ -717,8 +728,11 @@ impl CustomWindowsUtils {
     pub fn get_texture_id(&self, image_path: &str, config_dir_path: &str) -> Option<TextureId> {
         let mut cached_images = self
             .cached_images
-            .try_lock()
-            .unwrap_or_crash(zencstr!("[ERROR] Failed locking cached images!"));
+            .try_borrow_mut()
+            .ok()
+            .unwrap_or_crash(zencstr!(
+                "[ERROR] Failed borrowing cached images as mutable!"
+            ));
         let mut full_image_path = ZString::new(String::with_capacity(
             config_dir_path.len() + image_path.len(),
         ));
@@ -736,7 +750,7 @@ impl CustomWindowsUtils {
     /// Gets the window data for the currently focused window, if any.
     /// If there are no windows, `WindowData::default()` is returned.
     pub fn get_current_window_data(&self) -> WindowData {
-        let Some(window_titles) = self.window_titles.try_lock() else {
+        let Some(window_titles) = self.window_titles.try_read() else {
             return WindowData::default();
         };
 
@@ -746,7 +760,7 @@ impl CustomWindowsUtils {
 
         self.window_data
             .borrow()
-            .get(&self.current_window_index.get())
+            .get(self.current_window_index.get())
             .map_or_else(WindowData::default, |data| *data)
     }
 
@@ -816,7 +830,7 @@ impl CustomWindowsUtils {
 
     /// Retains all widgets that have their identifier present in `identifiers`.
     pub fn retain_widgets_by_identifiers(&self, identifiers: Vec<String>) {
-        let Some(window_widgets) = self.window_widgets.try_lock() else {
+        let Ok(window_widgets) = self.window_widgets.try_borrow() else {
             return;
         };
 
@@ -830,12 +844,12 @@ impl CustomWindowsUtils {
     }
 
     /// Gets the pending scripts to be executed.
-    pub fn get_pending_scripts(&self) -> &Mutex<Option<Vec<String>>> {
+    pub fn get_pending_scripts(&self) -> &RefCell<Option<Vec<String>>> {
         &self.pending_scripts
     }
 
     /// Gets the value of `self.cached_images`.
-    pub fn get_cached_images(&self) -> &Mutex<AHashMap<String, Option<TextureId>>> {
+    pub fn get_cached_images(&self) -> &RefCell<AHashMap<String, Option<TextureId>>> {
         &self.cached_images
     }
 }

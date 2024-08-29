@@ -158,7 +158,8 @@ impl DX11UI {
         let custom_window_utils = base_core_reader.get_custom_window_utils();
         let Some(pending_scripts) = custom_window_utils
             .get_pending_scripts()
-            .try_lock()
+            .try_borrow_mut()
+            .ok()
             .and_then(|mut pending_scripts| pending_scripts.take())
         else {
             return;
@@ -176,7 +177,8 @@ impl DX11UI {
             reader
                 .get_custom_window_utils()
                 .get_cached_images()
-                .try_lock()
+                .try_borrow_mut()
+                .ok()
         }) else {
             return;
         };
