@@ -53,6 +53,9 @@ pub struct ScriptCore {
 
     /// Special comments that upon found, toggle special compilation behavior.
     compiler_special_settings: [&'static str; 2],
+
+    /// Global Script Variables.
+    global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
 }
 
 thread_safe_structs!(ScriptCore);
@@ -68,6 +71,7 @@ impl ScriptCore {
                 "//# EnableCompilerOption: NewThreadMain",
                 "//# DisableCompilerOption: CLIDiagnostics",
             ],
+            global_script_variables: Default::default(),
         }
     }
 
@@ -91,6 +95,7 @@ impl ScriptCore {
             Arc::clone(&base_core),
             base_core_reader.get_crosscom(),
             base_core_reader.get_config().get_product_serials(),
+            Arc::clone(&self.global_script_variables),
         )? {
             context.install(module)?;
         }

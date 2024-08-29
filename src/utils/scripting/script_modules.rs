@@ -16,9 +16,10 @@ use crate::{
     },
     winutils::{AddressType, WinUtils},
 };
+use ahash::AHashMap;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
-use rune::{runtime::Function, ContextError, Module, Value};
+use rune::{alloc::clone::TryClone, runtime::Function, ContextError, Module, Value};
 use std::{
     ffi::CString,
     fmt::{Debug, Display},
@@ -39,6 +40,7 @@ impl SystemModules {
         base_core: Arc<RwLock<BaseCore>>,
         crosscom: Arc<RwLock<CrossCom>>,
         serials: Arc<Vec<String>>,
+        global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
     ) -> Result<Vec<Module>, ContextError> {
         let mut module = Module::new();
         let mut dynamic_module = Module::with_crate(&zencstr!("dynamic").data)?;
@@ -259,6 +261,24 @@ impl SystemModules {
         std_module.function("ltof", |l: i64| l as f32).build()?;
         std_module.function("ltod", |l: i64| l as f64).build()?;
 
+        let global_script_variables_clone = Arc::clone(&global_script_variables);
+        std_module
+            .function("define_global", move |variable_name, value| {
+                Self::define_global(
+                    variable_name,
+                    value,
+                    Arc::clone(&global_script_variables_clone),
+                )
+            })
+            .build()?;
+
+        let global_script_variables_clone = Arc::clone(&global_script_variables);
+        std_module
+            .function("get_global", move |variable_name| {
+                Self::get_global(variable_name, Arc::clone(&global_script_variables_clone))
+            })
+            .build()?;
+
         Ok(vec![
             module,
             dynamic_module,
@@ -273,6 +293,38 @@ impl SystemModules {
             arctic_module,
             std_module,
         ])
+    }
+
+    /// Defines a new global variable if not present, otherwise updates the existing variable.
+    fn define_global(
+        variable_name: String,
+        value: Value,
+        global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
+    ) {
+        let Some(mut global_script_variables) = global_script_variables.try_write() else {
+            log!("[ERROR] global_script_variables is locked, cannot modify globals!");
+            return;
+        };
+
+        global_script_variables.insert(variable_name, ValueWrapper(value));
+    }
+
+    /// Gets a clone of the value from the identified global variable.
+    fn get_global(
+        variable_name: String,
+        global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
+    ) -> Option<Value> {
+        let Some(global_script_variables) = global_script_variables.try_read() else {
+            log!("[ERROR] global_script_variables is locked, cannot read globals!");
+            return None;
+        };
+
+        global_script_variables.get(&variable_name).map(|value| {
+            value
+                .0
+                .try_clone() // Stupid, but either that or &'static due to lifetime issues.
+                .unwrap_or_else(|error| crash!("[ERROR] Failed cloning value, error: ", error))
+        })
     }
 
     /// Runs a defined function on a new thread. This is especially useful when the user doesn't
