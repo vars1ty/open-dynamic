@@ -1,12 +1,12 @@
 use super::scripting::script_core::ValueWrapper;
 use crate::utils::extensions::OptionExt;
-use parking_lot::RwLock;
+use parking_lot::{Once, RwLock};
 use retour::RawDetour;
 use rune::{
     runtime::{Function, SyncFunction},
     Value,
 };
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 /// Generates code for the unique ID tied to the calling function, and collects 10 arguments from
 /// `args` into `args_out`.
@@ -16,11 +16,10 @@ use std::sync::{Arc, OnceLock};
 /// Leave as `{}` for no code to be executed.
 macro_rules! generate_detour_id {
     ($id:literal, $args:expr, $call_once:expr) => {{
-        static UNIQUE_DETOUR_ID: OnceLock<u8> = OnceLock::new();
-        UNIQUE_DETOUR_ID.get_or_init(|| {
+        static CALL_ONCE: Once = Once::new();
+        CALL_ONCE.call_once(|| {
             RDetour::register_new_detour($id);
             $call_once();
-            $id
         });
 
         let mut collected_args = Vec::with_capacity(10);

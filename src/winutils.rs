@@ -264,16 +264,15 @@ impl WinUtils {
 
     /// Parses a hexadecimal value to its normal primitive value.
     pub fn hex_to_primitive(hex: &str) -> RuneDoubleResultPrimitive {
-        let value_i64 = i64::from_str_radix(&hex[2..], 16).unwrap_or_else(|_| {
-            log!("[ERROR] Failed parsing ", hex, " as i64!");
-            0
-        });
-        let value_i32 = i32::from_str_radix(&hex[2..], 16).unwrap_or_else(|_| {
-            log!("[ERROR] Failed parsing ", hex, " as i32!");
-            0
-        });
-
-        RuneDoubleResultPrimitive::new(value_i32 as i8, value_i32, value_i64, value_i32 as f32, value_i64 as f64)
+        let value_i64 = i64::from_str_radix(&hex[2..], 16).unwrap_or_default();
+        let value_i32 = i32::from_str_radix(&hex[2..], 16).unwrap_or_default();
+        RuneDoubleResultPrimitive::new(
+            value_i32 as i8,
+            value_i32,
+            value_i64,
+            value_i32 as f32,
+            value_i64 as f64,
+        )
     }
 
     /// Gets the address to a function inside of a module.

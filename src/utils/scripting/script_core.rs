@@ -23,16 +23,7 @@ thread_safe_structs!(ValueWrapper);
 
 /// Structure that implements Send and Sync so that the `Vm` inside of it can be sent between
 /// threads.
-/// It also embeds a hash of the script source so that it can be compared against the key hash,
-/// ensuring that it becomes more difficult to tamper with.
-struct VMWrapper {
-    /// Virtual Machine instance.
-    pub vm: Vm,
-
-    /// Hash of the source inside the Virtual Machine.
-    pub hash: String,
-}
-
+struct VMWrapper(pub Vm);
 thread_safe_structs!(VMWrapper);
 
 /// Rune Scripting core.
@@ -176,7 +167,6 @@ impl ScriptCore {
             return;
         };
 
-        self.perform_integrity_check(&compiled_scripts);
         let source = self.add_imports(&source, reader.get_config().get_path());
         if compiled_scripts.get(&hash).is_some() {
             let crosscom = reader.get_crosscom();
@@ -191,15 +181,8 @@ impl ScriptCore {
         let start = std::time::Instant::now();
         let compile = self.compile(&source, Arc::clone(&base_core));
         if let Ok(vm) = compile {
-            // Uncached, compile, store and run the main function.
-            let hash_clone = hash.to_owned();
-            compiled_scripts.insert(
-                hash,
-                VMWrapper {
-                    vm,
-                    hash: hash_clone,
-                },
-            );
+            // Uncached source. Compile, store and run the main function.
+            compiled_scripts.insert(hash, VMWrapper(vm));
             let crosscom = reader.get_crosscom();
             drop(compiled_scripts);
             drop(reader);
@@ -215,16 +198,6 @@ impl ScriptCore {
         }
 
         log!("[Script Engine] Compile error: ", compile.unwrap_err());
-    }
-
-    /// Performs a basic integrity check on all scripts, ensuring that the stored hash inside of
-    /// the value structure, is the same as the key.
-    fn perform_integrity_check(&self, compiled_scripts: &AHashMap<String, VMWrapper>) {
-        for (script_hash, vm_info_struct) in compiled_scripts {
-            if vm_info_struct.hash != *script_hash {
-                crash!("[ERROR] Script Tampering detected!");
-            }
-        }
     }
 
     /// Executes the main function found in `source`.
@@ -251,7 +224,7 @@ impl ScriptCore {
                 return;
             };
 
-            let main = vm.vm.lookup_function(["main"]);
+            let main = vm.0.lookup_function(["main"]);
             if let Err(error) = main {
                 log!("[ERROR] Compile error when looking up main, error: ", error);
                 return;

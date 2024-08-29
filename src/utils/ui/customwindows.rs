@@ -19,35 +19,20 @@ type WidgetsMap = IndexMap<String, Rc<RefCell<WidgetType>>>;
 /// Technical data about a custom window.
 #[derive(Default, Any, Clone, Copy)]
 pub struct WindowData {
-    /// Width of the window.
+    /// Width and height of the window.
     #[rune(get)]
-    pub window_width: f32,
+    pub window_dimensions: (f32, f32),
 
-    /// Height of the window.
+    /// X and Y-Position of the window.
     #[rune(get)]
-    pub window_height: f32,
+    pub window_pos: (f32, f32),
 
-    /// X-Position of the window.
+    /// Available width and height.
     #[rune(get)]
-    pub window_pos_x: f32,
+    pub available_size: (f32, f32),
 
-    /// Y-Position of the window.
-    #[rune(get)]
-    pub window_pos_y: f32,
-
-    /// Available width window size.
-    #[rune(get)]
-    pub available_size_x: f32,
-
-    /// Available height window size.
-    #[rune(get)]
-    pub available_size_y: f32,
-
-    /// X-position of the cursor in window-space.
-    pub cursor_pos_x: f32,
-
-    /// Y-position of the cursor in window-space.
-    pub cursor_pos_y: f32,
+    /// X and Y-position of the cursor in window-space.
+    pub cursor_pos: (f32, f32),
 }
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
@@ -65,7 +50,7 @@ pub struct CustomWindowsUtils {
     current_window_index: Cell<usize>,
 
     /// Window size constraints.
-    window_size_constraints: Mutex<Vec<[f32; 4]>>,
+    window_size_constraints: RefCell<Vec<[f32; 4]>>,
 
     /// Cached GPU TextureIds, key being the path to the image.
     cached_images: RefCell<AHashMap<String, Option<TextureId>>>,
@@ -113,7 +98,7 @@ impl CustomWindowsUtils {
             return;
         };
 
-        let Some(window_size_constraints) = self.window_size_constraints.try_lock() else {
+        let Ok(window_size_constraints) = self.window_size_constraints.try_borrow() else {
             return;
         };
 
@@ -342,14 +327,10 @@ impl CustomWindowsUtils {
         self.window_data.borrow_mut().insert(
             window_index,
             WindowData {
-                window_width: window_size[0],
-                window_height: window_size[1],
-                window_pos_x: window_pos[0],
-                window_pos_y: window_pos[1],
-                available_size_x: available_size[0],
-                available_size_y: available_size[1],
-                cursor_pos_x: cursor_pos[0],
-                cursor_pos_y: cursor_pos[1],
+                window_dimensions: window_size.into(),
+                window_pos: window_pos.into(),
+                available_size: available_size.into(),
+                cursor_pos: cursor_pos.into(),
             },
         );
     }
@@ -378,7 +359,7 @@ impl CustomWindowsUtils {
             return;
         };
 
-        let Some(mut window_size_constraints) = self.window_size_constraints.try_lock() else {
+        let Ok(mut window_size_constraints) = self.window_size_constraints.try_borrow_mut() else {
             return;
         };
 
@@ -410,7 +391,7 @@ impl CustomWindowsUtils {
             return;
         };
 
-        let Some(mut window_size_constraints) = self.window_size_constraints.try_lock() else {
+        let Ok(mut window_size_constraints) = self.window_size_constraints.try_borrow_mut() else {
             return;
         };
 
@@ -675,8 +656,12 @@ impl CustomWindowsUtils {
     pub fn set_active_window_size_constraints(&self, constraints: [f32; 4]) {
         if let Some(active_constraints) = self
             .window_size_constraints
-            .lock()
-            .get_mut(self.current_window_index.get())
+            .try_borrow_mut()
+            .ok()
+            .as_mut()
+            .and_then(|active_constraints| {
+                active_constraints.get_mut(self.current_window_index.get())
+            })
         {
             *active_constraints = constraints;
         }

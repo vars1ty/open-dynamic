@@ -1,5 +1,14 @@
 use crate::utils::{
-    api::API, config::Config, crosscom::{CrossCom, CrossComState}, eguiutils::ImGuiUtils, extensions::OptionExt, prompter::Prompter, runedetour::RDetour, scripting::{arctic::Arctic, script_core::ScriptCore}, stringutils::StringUtils, ui::customwindows::CustomWindowsUtils
+    api::API,
+    config::Config,
+    crosscom::{CrossCom, CrossComState},
+    eguiutils::ImGuiUtils,
+    extensions::OptionExt,
+    prompter::Prompter,
+    runedetour::RDetour,
+    scripting::{arctic::Arctic, script_core::ScriptCore},
+    stringutils::StringUtils,
+    ui::customwindows::CustomWindowsUtils,
 };
 use parking_lot::RwLock;
 use std::sync::{Arc, LazyLock, OnceLock};
@@ -115,12 +124,10 @@ impl BaseCore {
             // If it has been 10 seconds and we aren't connected, ask the user if they want to try
             // again or give up.
             if elapsed == 10.0 && !is_connected {
+                drop(reader);
+                drop(instance);
                 let mut prompt = Prompter::new("[PROMPT] Write 'r' to try and re-connect. Write any other response to close dynamic.", smallvec!["R", "r"]);
                 if prompt.prompt().is_some() {
-                    log!("Freeing old resources...");
-                    drop(reader);
-                    drop(instance);
-
                     log!("Trying to connect again...");
                     break Self::connect_crosscom(username, channel, use_local_server, main_serial);
                 }
