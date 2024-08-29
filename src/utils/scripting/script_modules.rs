@@ -16,7 +16,7 @@ use crate::{
     },
     winutils::{AddressType, WinUtils},
 };
-use ahash::AHashMap;
+use dashmap::DashMap;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rune::{alloc::clone::TryClone, runtime::Function, ContextError, Module, Value};
@@ -40,7 +40,7 @@ impl SystemModules {
         base_core: Arc<RwLock<BaseCore>>,
         crosscom: Arc<RwLock<CrossCom>>,
         serials: Arc<Vec<String>>,
-        global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
+        global_script_variables: Arc<DashMap<String, ValueWrapper>>,
     ) -> Result<Vec<Module>, ContextError> {
         let mut module = Module::new();
         let mut dynamic_module = Module::with_crate(&zencstr!("dynamic").data)?;
@@ -299,26 +299,16 @@ impl SystemModules {
     fn define_global(
         variable_name: String,
         value: Value,
-        global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
+        global_script_variables: Arc<DashMap<String, ValueWrapper>>,
     ) {
-        let Some(mut global_script_variables) = global_script_variables.try_write() else {
-            log!("[ERROR] global_script_variables is locked, cannot modify globals!");
-            return;
-        };
-
         global_script_variables.insert(variable_name, ValueWrapper(value));
     }
 
     /// Gets a clone of the value from the identified global variable.
     fn get_global(
         variable_name: String,
-        global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
+        global_script_variables: Arc<DashMap<String, ValueWrapper>>,
     ) -> Option<Value> {
-        let Some(global_script_variables) = global_script_variables.try_read() else {
-            log!("[ERROR] global_script_variables is locked, cannot read globals!");
-            return None;
-        };
-
         global_script_variables.get(&variable_name).map(|value| {
             value
                 .0

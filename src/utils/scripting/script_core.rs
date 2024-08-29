@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use ahash::AHashMap;
+use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{
     termcolor::{ColorChoice, StandardStream},
@@ -55,7 +56,7 @@ pub struct ScriptCore {
     compiler_special_settings: [&'static str; 2],
 
     /// Global Script Variables.
-    global_script_variables: Arc<RwLock<AHashMap<String, ValueWrapper>>>,
+    global_script_variables: Arc<DashMap<String, ValueWrapper>>,
 }
 
 thread_safe_structs!(ScriptCore);
