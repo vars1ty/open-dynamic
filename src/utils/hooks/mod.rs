@@ -38,6 +38,7 @@ impl GenericHoooks {
     }
 
     /// SetCursorPos hook.
+    /// TODO: Migrate over to RawDetour or GenericDetour.
     fn set_cursor_pos(x: i32, y: i32, disable_cursor_pos: Arc<AtomicBool>) -> bool {
         unsafe {
             if disable_cursor_pos.load(Ordering::SeqCst) {

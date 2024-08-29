@@ -16,6 +16,10 @@ use rune::{
 use std::{error::Error, ffi::CString, sync::Arc};
 use zstring::ZString;
 
+/// Wrapper around `Value` to force it to be "thread-safe".
+pub struct ValueWrapper(pub Value);
+thread_safe_structs!(ValueWrapper);
+
 /// Structure that implements Send and Sync so that the `Vm` inside of it can be sent between
 /// threads.
 /// It also embeds a hash of the script source so that it can be compared against the key hash,

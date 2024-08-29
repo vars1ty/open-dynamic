@@ -1,7 +1,11 @@
+use super::scripting::script_core::ValueWrapper;
 use crate::utils::extensions::OptionExt;
 use parking_lot::RwLock;
 use retour::RawDetour;
-use rune::runtime::{Function, SyncFunction};
+use rune::{
+    runtime::{Function, SyncFunction},
+    Value,
+};
 use std::sync::{Arc, OnceLock};
 
 /// Generates code for the unique ID tied to the calling function, and collects 10 arguments from
@@ -60,6 +64,10 @@ pub struct RDetour {
     /// return value as a pointer, or a modified value if needed.
     /// If `None`, this detour isn't ready to be used and is free to be acquired.
     rune_function: Option<SyncFunction>,
+
+    /// Optional paramater to be passed into `rune_function` upon callback.
+    /// Can be a structure for example, so that variables can be updated.
+    opt_param: Option<ValueWrapper>,
 }
 
 impl RDetour {
@@ -119,7 +127,7 @@ impl RDetour {
 
     /// Automatically finds the first-available `RDetour` and installs it on `from_ptr` with the
     /// callback function of `rune_function`.
-    pub fn install_detour_auto(from_ptr: i64, rune_function: Function) {
+    pub fn install_detour_auto(from_ptr: i64, rune_function: Function, opt_param: Option<Value>) {
         let rune_function = rune_function.into_sync().into_result();
         if let Err(error) = rune_function {
             log!(
@@ -140,7 +148,7 @@ impl RDetour {
             .unwrap_or_crash(zencstr!(
                 "[ERROR] The found detour is locked and cannot be modified!"
             ))
-            .install_detour(from_ptr, rune_function);
+            .install_detour(from_ptr, rune_function, opt_param);
     }
 
     /// Finds the first-available `RDetour` and returns it.
@@ -159,7 +167,12 @@ impl RDetour {
 
     /// Installs a detour from `from_ptr` into a freely-available detour holder function, which
     /// calls `rune_function`.
-    fn install_detour(&mut self, from_ptr: i64, rune_function: SyncFunction) {
+    fn install_detour(
+        &mut self,
+        from_ptr: i64,
+        rune_function: SyncFunction,
+        opt_param: Option<Value>,
+    ) {
         if self.is_detour_acquired() {
             log!(
                 "[ERROR] The detour of ID ",
@@ -172,6 +185,7 @@ impl RDetour {
         let to_ptr = self.determine_detour_holder();
         self.rune_function = Some(rune_function);
         self.from_ptr = Some(from_ptr);
+        self.opt_param = opt_param.map(ValueWrapper);
 
         unsafe {
             let hook = Self::create_hook(from_ptr as *const (), to_ptr);
@@ -225,7 +239,11 @@ impl RDetour {
 
         let original = detour.trampoline() as *const ();
         let call_res = rune_function
-            .call::<(i64, Vec<i64>), i64>((original as _, args))
+            .call::<(i64, Vec<i64>, Option<&Value>), i64>((
+                original as _,
+                args,
+                rdetour.opt_param.as_ref().map(|value| &value.0),
+            ))
             .into_result();
         let Err(error) = call_res else {
             return call_res.unwrap_or_else(|error| {

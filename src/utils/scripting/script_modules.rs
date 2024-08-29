@@ -1,4 +1,7 @@
-use super::{fncaller::FNCaller, script_core::ScriptCore};
+use super::{
+    fncaller::FNCaller,
+    script_core::{ScriptCore, ValueWrapper},
+};
 use crate::{
     globals::*,
     mod_cores::base_core::BaseCore,
@@ -25,10 +28,6 @@ use std::{
 };
 use windows::Win32::System::{Console::AllocConsole, Threading::GetCurrentProcess};
 use wmem::Memory;
-
-/// Wrapper around `Value` to force it to be "thread-safe".
-struct ValueWrapper(pub Value);
-thread_safe_structs!(ValueWrapper);
 
 /// System modules, like Memory operations and such.
 pub struct SystemModules;
@@ -152,9 +151,7 @@ impl SystemModules {
             .build()?;
 
         memory_module
-            .function("fn_call", |fn_addr, params: Vec<Value>| {
-                FNCaller::call_auto(fn_addr, params)
-            })
+            .function("fn_call", FNCaller::call_auto)
             .build()?;
         memory_module
             .function("hook_function", RDetour::install_detour_auto)
@@ -595,6 +592,7 @@ impl UIModules {
 
         module
             .function("add_legacy_button", move |identifier, text, rune_code| {
+                log!("[WARN] Legacy buttons will be removed in the future!");
                 custom_window_utils
                     .add_widget(identifier, WidgetType::LegacyButton(text, rune_code))
             })
