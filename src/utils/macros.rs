@@ -2,18 +2,18 @@
 #[macro_export]
 macro_rules! log {
     ($arg:literal) => {
-        $crate::winutils::WinUtils::log_message(&mut zencstr!("[", file!(), ":", line!(), "]: ", $arg), true);
+        $crate::winutils::WinUtils::log_message(zencstr!("[", file!(), ":", line!(), "]: ", $arg), true);
     };
     ($arg:expr) => {
-        $crate::winutils::WinUtils::log_message(&mut zencstr!("[", file!(), ":", line!(), "]: ", $arg), true);
+        $crate::winutils::WinUtils::log_message(zencstr!("[", file!(), ":", line!(), "]: ", $arg), true);
     };
     ($($arg:expr),*) => {
         {
-            $crate::winutils::WinUtils::log_message(&mut zencstr!("[", file!(), ":", line!(), "]: "), false);
+            $crate::winutils::WinUtils::log_message(zencstr!("[", file!(), ":", line!(), "]: "), false);
             $(
-                $crate::winutils::WinUtils::log_message(&mut zencstr!(format!("{}", encrypt_arg!($arg))), false);
+                $crate::winutils::WinUtils::log_message(zencstr!(format!("{}", encrypt_arg!($arg))), false);
             )*
-            $crate::winutils::WinUtils::log_message(&mut zencstr!(""), true);
+            $crate::winutils::WinUtils::log_message(zencstr!(""), true);
         }
     };
 }

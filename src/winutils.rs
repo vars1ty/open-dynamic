@@ -450,7 +450,7 @@ impl WinUtils {
     /// # Safety
     /// This should be relatively safe due to the usage of `OnceLock` and `Mutex<ZString>`.
     #[optimize(size)]
-    pub fn log_message(message: &mut ZString, new_line: bool) {
+    pub fn log_message(mut message: ZString, new_line: bool) {
         let Some(mut logged_messages) = LOGGED_MESSAGES.get_or_init(Default::default).try_lock()
         else {
             return;
