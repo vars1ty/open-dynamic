@@ -172,7 +172,10 @@ impl ScriptCore {
             return;
         };
 
-        let source = self.add_imports(&source, reader.get_config().get_path());
+        let source = self
+            .add_imports(&source, reader.get_config().get_path())
+            .unwrap_or(source);
+
         if compiled_scripts.get(&hash).is_some() {
             let crosscom = reader.get_crosscom();
             drop(compiled_scripts);
@@ -266,15 +269,16 @@ impl ScriptCore {
     }
 
     /// Adds referenced imports to the initial script, then returns the result.
-    fn add_imports(&self, source: &str, config_directory: &str) -> String {
+    fn add_imports(&self, source: &str, config_directory: &str) -> Option<String> {
         let pub_fn_main = self.vm_string_settings[0];
         let r#macro = self.vm_string_settings[1];
-        let mut new_source = source.to_owned();
 
         // Only process if the "macro" has a chance of existing.
-        if !new_source.contains(r#macro) {
-            return new_source;
+        if !source.contains(r#macro) {
+            return None;
         }
+
+        let mut new_source = source.to_owned();
 
         // Loop over all lines until we hit `pub fn main()`.
         for (i, line) in source.lines().enumerate() {
@@ -297,7 +301,7 @@ impl ScriptCore {
                     i,
                     " when processing script!"
                 );
-                return String::default();
+                return None;
             };
 
             // Valid source usage, process.
@@ -328,7 +332,7 @@ impl ScriptCore {
             .collect::<Vec<_>>()
             .join("\n");
 
-        new_source
+        Some(new_source)
     }
 
     /// Adds a module to `cross_modules` which is a set of modules that have been added from
