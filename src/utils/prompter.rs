@@ -78,13 +78,13 @@ impl<'a> Prompter<'a> {
     /// Only executes if there's any valid responses set.
     #[allow(unused)]
     pub fn print_invalid_usage(&self) {
-        if self.valid_responses.is_none() {
+        let Some(ref valid_responses) = self.valid_responses else {
             return;
-        }
+        };
 
         log!(
             "Invalid Usage! Valid responses are: ",
-            self.valid_responses.as_ref().unwrap().join(",")
+            valid_responses.join(",")
         )
     }
 }

@@ -32,6 +32,7 @@ pub struct WindowData {
     pub available_size: (f32, f32),
 
     /// X and Y-position of the cursor in window-space.
+    #[rune(get)]
     pub cursor_pos: (f32, f32),
 }
 
@@ -320,17 +321,13 @@ impl CustomWindowsUtils {
 
     /// Updates the technical data about a custom window.
     fn update_window_data(&self, ui: &imgui::Ui, window_index: usize) {
-        let available_size = ui.content_region_avail();
-        let window_size = ui.window_size();
-        let window_pos = ui.window_pos();
-        let cursor_pos = ui.cursor_pos();
         self.window_data.borrow_mut().insert(
             window_index,
             WindowData {
-                window_dimensions: window_size.into(),
-                window_pos: window_pos.into(),
-                available_size: available_size.into(),
-                cursor_pos: cursor_pos.into(),
+                window_dimensions: ui.window_size().into(),
+                window_pos: ui.window_pos().into(),
+                available_size: ui.content_region_avail().into(),
+                cursor_pos: ui.cursor_pos().into(),
             },
         );
     }

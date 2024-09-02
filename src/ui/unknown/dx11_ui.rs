@@ -242,11 +242,11 @@ impl ImguiRenderLoop for DX11UI {
             .unwrap_or_crash(zencstr!("[ERROR] BaseCore is locked!"));
 
         let imgui_utils = base_core_reader.get_imgui_utils();
-        let mut imgui_utils_writer = imgui_utils
-            .try_write()
+        let imgui_utils_reader = imgui_utils
+            .try_read()
             .unwrap_or_crash(zencstr!("[ERROR] ImGuiUtils is locked!"));
 
-        imgui_utils_writer.apply_style(
+        imgui_utils_reader.apply_style(
             ctx,
             base_core_reader.get_config(),
             base_core_reader.get_crosscom(),
@@ -329,6 +329,7 @@ impl ImguiRenderLoop for DX11UI {
             .build(|| {
                 let imgui_utils = base_core_reader.get_imgui_utils();
                 let Some(mut imgui_utils_writer) = imgui_utils.try_write() else {
+                    label!(ui, "ImGuiUtils is locked, settings unavailable!");
                     return;
                 };
 

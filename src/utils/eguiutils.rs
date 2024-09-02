@@ -4,7 +4,7 @@ use crate::{
     utils::{colorutils::ColorUtils, config::Config, extensions::OptionExt},
     winutils::WinUtils,
 };
-use ahash::AHashMap;
+use dashmap::DashMap;
 use hudhook::imgui::{self, internal::DataTypeKind, sys::*, *};
 use parking_lot::RwLock;
 use std::sync::Arc;
@@ -23,20 +23,20 @@ pub struct ImGuiUtils {
 
     /// A map to keep track of the custom-added fonts, so we can use the relative path to identify
     /// them.
-    pub fonts: AHashMap<Arc<String>, usize>,
+    pub fonts: DashMap<Arc<String>, usize>,
 }
 
 impl ImGuiUtils {
     pub fn new() -> Self {
         Self {
             enable_side_messages: true,
-            fonts: AHashMap::new(),
+            fonts: DashMap::new(),
         }
     }
 
     /// Applies a custom font.
     fn apply_font(
-        &mut self,
+        &self,
         ctx: &mut imgui::Context,
         config: &Config,
         crosscom: Arc<RwLock<CrossCom>>,
@@ -84,7 +84,7 @@ impl ImGuiUtils {
 
         // Load custom fonts if any are defined.
         let Some(custom_fonts) = config.get_fonts().take() else {
-            log!("Font Loader: No custom fonts have been defined, skipping.");
+            log!("[FONTS] No custom fonts have been defined, skipping.");
             return;
         };
 
@@ -105,7 +105,7 @@ impl ImGuiUtils {
             }]);
 
             log!(
-                "Font Loader: Installed font from relative path \"",
+                "[FONTS] Installed font from relative path \"",
                 relative_font_path,
                 "\", size: ",
                 font_size,
@@ -120,7 +120,7 @@ impl ImGuiUtils {
 
     /// Applies the custom theme.
     pub fn apply_style(
-        &mut self,
+        &self,
         ctx: &mut imgui::Context,
         config: &Config,
         crosscom: Arc<RwLock<CrossCom>>,

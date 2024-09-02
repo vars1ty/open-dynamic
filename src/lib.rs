@@ -54,6 +54,7 @@ extern "system" fn DllMain(
     call_reason: u32,
     reserved: *const c_void,
 ) -> BOOL {
+    std::env::set_var("RUST_BACKTRACE", "full");
     const DLL_PROCESS_ATTACH: u32 = 1;
     const DLL_PROCESS_DETACH: u32 = 0;
 

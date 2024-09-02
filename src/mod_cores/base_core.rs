@@ -10,8 +10,9 @@ use crate::utils::{
     stringutils::StringUtils,
     ui::customwindows::CustomWindowsUtils,
 };
-use parking_lot::RwLock;
+use parking_lot::{Once, RwLock};
 use std::sync::{Arc, LazyLock, OnceLock};
+use zstring::ZString;
 
 /// A base core structure which holds a handle to the current process, and an instance to `Config`.
 pub struct BaseCore {
@@ -22,7 +23,7 @@ pub struct BaseCore {
     crosscom: Arc<RwLock<CrossCom>>,
 
     /// ScriptCore instance.
-    script_core: &'static ScriptCore,
+    script_core: LazyLock<&'static ScriptCore>,
 
     /// Custom Window utilities instance.
     custom_window_utils: LazyLock<&'static CustomWindowsUtils>,
@@ -71,7 +72,7 @@ impl BaseCore {
                     main_serial,
                 ))
             },
-            script_core: Box::leak(Box::new(ScriptCore::init())),
+            script_core: LazyLock::new(|| Box::leak(Box::new(ScriptCore::init()))),
             custom_window_utils: LazyLock::new(|| Box::leak(Box::default())),
             arctic_core: OnceLock::new(),
             imgui_utils: Arc::new(RwLock::new(ImGuiUtils::new())),
@@ -127,9 +128,12 @@ impl BaseCore {
             if elapsed == 10.0 && !is_connected {
                 drop(reader);
                 drop(instance);
+
                 let mut prompt = Prompter::new("[PROMPT] Write 'r' to try and re-connect. Write any other response to close dynamic.", smallvec!["R", "r"]);
                 if prompt.prompt().is_some() {
-                    log!("Trying to connect again...");
+                    log!("[PROMPT] Trying to connect again...");
+                    drop(prompt);
+
                     break Self::connect_crosscom(username, channel, use_local_server, main_serial);
                 }
 
@@ -139,27 +143,40 @@ impl BaseCore {
     }
 
     /// Starts `parking_lot`'s experimental deadlock detection.
+    /// This also uses a static `Once` instance, ensuring that if it is somehow called twice, it
+    /// won't execute the main logic more than once.
     fn start_deadlock_detection() {
-        std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(2));
-            let deadlocks = parking_lot::deadlock::check_deadlock();
-            if deadlocks.is_empty() {
-                continue;
-            }
-
-            for (i, threads) in deadlocks.iter().enumerate() {
-                log!("[ERROR] Deadlock detected! Index: #", i);
-                for thread in threads {
-                    log!(
-                        "[DEADLOCK] Thread Id {:#?}",
-                        format!("{:#?}", thread.thread_id())
-                    );
-                    log!(
-                        "[DEADLOCK] Backtrace: {:#?}",
-                        format!("{:#?}", thread.backtrace())
-                    );
+        static START_ONCE: Once = Once::new();
+        START_ONCE.call_once(|| {
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                let deadlocks = parking_lot::deadlock::check_deadlock();
+                if deadlocks.is_empty() {
+                    continue;
                 }
-            }
+
+                let mut crash_log = ZString::default();
+                for (i, threads) in deadlocks.iter().enumerate() {
+                    log!("[ERROR] Deadlock detected, report it to #assistance!", i);
+                    for thread in threads {
+                        crash_log.push_zstring(zencstr!("Deadlock ID: ", i, "\n"));
+                        crash_log.push_zstring(zencstr!(
+                            "Thread ID: ",
+                            format!("{:#?}\n", thread.thread_id())
+                        ));
+                        crash_log.push_zstring(zencstr!(
+                            "Backtrace: ",
+                            format!("{:#?}\n", thread.backtrace())
+                        ));
+                    }
+                }
+
+                crash!(
+                    "[ERROR] Deadlock detected, crash log to send in #assistance:\n",
+                    crash_log,
+                    "\ndynamic will close as it isn't deemed safe to continue running."
+                );
+            });
         });
     }
 
@@ -174,8 +191,8 @@ impl BaseCore {
     }
 
     /// Gets the `ScriptCore` instance.
-    pub const fn get_script_core(&self) -> &'static ScriptCore {
-        self.script_core
+    pub fn get_script_core(&self) -> &'static ScriptCore {
+        &self.script_core
     }
 
     /// Returns an instance of `CustomWindowsUtils`.
