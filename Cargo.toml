@@ -36,6 +36,6 @@ overflow-checks = true
 incremental = true
 codegen-units = 1
 # panic = "abort"
-opt-level = "s"
+opt-level = 3
 # strip = true
 lto = "fat"
