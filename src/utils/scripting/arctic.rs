@@ -40,13 +40,13 @@ pub struct DNXFunctions {
     rune_vm_execute: Box<dyn Fn(String) + Send + Sync>,
 
     /// `dynamic::create_thread_key(name)` function. Creates a globally-accessible thread-key.
-    dyamic_add_thread_key: extern "Rust" fn(String),
+    dyamic_add_thread_key: Box<dyn Fn(String) + Send + Sync>,
 
     /// `dynamic::set_thread_key_value(name, value)` function. Sets the value of a thread-key.
-    dynamic_set_thread_key_value: extern "Rust" fn(String, bool),
+    dynamic_set_thread_key_value: Box<dyn Fn(String, bool) + Send + Sync>,
 
     /// `dynamic::get_thread_key(name)` function. Returns the value of the thread-key.
-    dynamic_get_thread_key: extern "Rust" fn(String) -> bool,
+    dynamic_get_thread_key: Box<dyn Fn(String) -> bool + Send + Sync>,
 
     /// `ui::add_window(name)` function. Allocates and displays a new custom window.
     ui_add_window: Box<dyn Fn(String) + Send + Sync>,
@@ -107,6 +107,7 @@ pub struct DNXFunctions {
     config_get_serials: Box<dyn Fn() -> Arc<Vec<String>> + Send + Sync>,
 
     // ImGui functions, no explanation needed as they are self-explanatory and documented online.
+    // To be removed after IL has been remade.
     imgui_text: extern "Rust" fn(&Ui, &str),
     imgui_button: extern "Rust" fn(&Ui, &str) -> bool,
     imgui_button_with_size: extern "Rust" fn(&Ui, &str, [f32; 2]) -> bool,
@@ -190,6 +191,7 @@ impl Arctic {
                 let injected_dlls = Arc::clone(&injected_dlls);
 
                 let custom_window_utils = base_core_reader.get_custom_window_utils();
+                let script_core = base_core_reader.get_script_core();
 
                 drop(base_core_reader);
 
@@ -213,9 +215,19 @@ impl Arctic {
 
                         drop(reader);
                     }),
-                    dyamic_add_thread_key: SystemModules::create_thread_key,
-                    dynamic_set_thread_key_value: SystemModules::set_thread_key_value,
-                    dynamic_get_thread_key: SystemModules::get_thread_key,
+                    dyamic_add_thread_key: Box::new(|identifier| {
+                        SystemModules::create_thread_key(identifier, script_core.get_thread_keys())
+                    }),
+                    dynamic_set_thread_key_value: Box::new(|identifier, enabled| {
+                        SystemModules::set_thread_key_value(
+                            identifier,
+                            enabled,
+                            script_core.get_thread_keys(),
+                        )
+                    }),
+                    dynamic_get_thread_key: Box::new(|identifier| {
+                        SystemModules::get_thread_key(identifier, script_core.get_thread_keys())
+                    }),
                     ui_add_window: Box::new(move |name| {
                         custom_window_utils.add_window(name);
                     }),

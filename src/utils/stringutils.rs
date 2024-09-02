@@ -21,11 +21,7 @@ impl StringUtils {
 
     /// Converts a hex string to its byte-slice representation.
     pub fn hex_string_to_bytes(hex_string: String) -> Option<Vec<u8>> {
-        unsafe {
-            // Remove whitespaces with 1 allocation, then replace "??" with "7F" without allocating.
-            Self::replace_zero_alloc::<2>(&mut hex_string.replace(' ', ""), *b"??", *b"7F");
-        }
-
+        let hex_string = hex_string.to_owned().replace(' ', "").replace("??", "7F");
         if hex_string.len() % 2 != 0 {
             log!(
                 "[ERROR] Hex string must be even (hex_string.len() % 2 == 0 FAILED). String failing: \"",
@@ -42,6 +38,7 @@ impl StringUtils {
         for i in (0..hex_string.len()).step_by(2) {
             // Parse two characters as a hexadecimal number. If successful, add the byte.
             let Ok(byte) = u8::from_str_radix(&hex_string[i..i + 2], 16) else {
+                log!("[ERROR] u8 at ", i, " cannot be turned into a safe byte!");
                 return None;
             };
 

@@ -41,6 +41,7 @@ impl SystemModules {
         crosscom: Arc<RwLock<CrossCom>>,
         serials: Arc<Vec<String>>,
         global_script_variables: Arc<DashMap<String, ValueWrapper>>,
+        thread_keys: Arc<DashMap<String, bool>>,
     ) -> Result<Vec<Module>, ContextError> {
         let mut module = Module::new();
         let mut dynamic_module = Module::with_crate(&zencstr!("dynamic").data)?;
@@ -56,20 +57,33 @@ impl SystemModules {
         let mut std_module = Module::with_crate(&zencstr!("std").data)?;
 
         module.ty::<RuneDoubleResultPrimitive>()?;
+        module.ty::<AddressType>()?;
 
         dynamic_module
             .function("log", |data: String| {
                 log!(data);
             })
             .build()?;
+
+        let thread_keys_clone = Arc::clone(&thread_keys);
         dynamic_module
-            .function("create_thread_key", Self::create_thread_key)
+            .function("create_thread_key", move |identifier| {
+                Self::create_thread_key(identifier, Arc::clone(&thread_keys_clone))
+            })
             .build()?;
+
+        let thread_keys_clone = Arc::clone(&thread_keys);
         dynamic_module
-            .function("get_thread_key", Self::get_thread_key)
+            .function("get_thread_key", move |identifier| {
+                Self::get_thread_key(identifier, Arc::clone(&thread_keys_clone))
+            })
             .build()?;
+
+        let thread_keys_clone = Arc::clone(&thread_keys);
         dynamic_module
-            .function("set_thread_key_value", Self::set_thread_key_value)
+            .function("set_thread_key_value", move |identifier, enabled| {
+                Self::set_thread_key_value(identifier, enabled, Arc::clone(&thread_keys_clone))
+            })
             .build()?;
         dynamic_module
             .function("is_key_down", WinUtils::is_key_down)
@@ -537,31 +551,26 @@ impl SystemModules {
     /// Thread keys are unique keys with a `bool` value which should be checked in
     /// never-ending/long-running loops, as it's used to stop their execution.
     /// Without this, they won't stop until the program restarts.
-    pub fn create_thread_key(key: String) {
-        SCRIPTING_THREAD_KEYS
-            .get_or_init(Default::default)
-            .write()
-            .insert(key, true);
+    pub fn create_thread_key(key: String, thread_keys: Arc<DashMap<String, bool>>) {
+        thread_keys.insert(key, true);
     }
 
     /// Gets the value of a Thread key.
-    pub fn get_thread_key(key: String) -> bool {
-        *SCRIPTING_THREAD_KEYS
-            .get_or_init(Default::default)
-            .read()
-            .get(&key)
-            .unwrap_or_crash(zencstr!(
-                "[ERROR] Thread Key ",
-                key,
-                " has not been defined!"
-            ))
+    pub fn get_thread_key(key: String, thread_keys: Arc<DashMap<String, bool>>) -> bool {
+        *thread_keys.get(&key).unwrap_or_crash(zencstr!(
+            "[ERROR] Thread Key ",
+            key,
+            " has not been defined!"
+        ))
     }
 
     /// Sets the value of a Thread key.
-    pub fn set_thread_key_value(key: String, enabled: bool) {
-        SCRIPTING_THREAD_KEYS
-            .get_or_init(Default::default)
-            .write()
+    pub fn set_thread_key_value(
+        key: String,
+        enabled: bool,
+        thread_keys: Arc<DashMap<String, bool>>,
+    ) {
+        thread_keys
             .entry(key)
             .and_modify(|value| *value = enabled)
             .or_insert(enabled);

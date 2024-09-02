@@ -22,7 +22,7 @@ pub struct BaseCore {
     crosscom: Arc<RwLock<CrossCom>>,
 
     /// ScriptCore instance.
-    script_core: ScriptCore,
+    script_core: &'static ScriptCore,
 
     /// Custom Window utilities instance.
     custom_window_utils: LazyLock<&'static CustomWindowsUtils>,
@@ -70,7 +70,7 @@ impl BaseCore {
                     main_serial,
                 ))
             },
-            script_core: ScriptCore::init(),
+            script_core: Box::leak(Box::new(ScriptCore::init())),
             custom_window_utils: LazyLock::new(|| Box::leak(Box::default())),
             arctic_core: OnceLock::new(),
             imgui_utils: Arc::new(RwLock::new(ImGuiUtils::new())),
@@ -148,8 +148,8 @@ impl BaseCore {
     }
 
     /// Gets the `ScriptCore` instance.
-    pub const fn get_script_core(&self) -> &ScriptCore {
-        &self.script_core
+    pub const fn get_script_core(&self) -> &'static ScriptCore {
+        self.script_core
     }
 
     /// Returns an instance of `CustomWindowsUtils`.

@@ -48,6 +48,9 @@ pub struct ScriptCore {
 
     /// Global Script Variables.
     global_script_variables: Arc<DashMap<String, ValueWrapper>>,
+
+    /// Global Thread Keys. This is kept for compatibility reasons only.
+    thread_keys: Arc<DashMap<String, bool>>,
 }
 
 thread_safe_structs!(ScriptCore);
@@ -64,6 +67,7 @@ impl ScriptCore {
                 "//# DisableCompilerOption: CLIDiagnostics",
             ],
             global_script_variables: Default::default(),
+            thread_keys: Default::default(),
         }
     }
 
@@ -88,6 +92,7 @@ impl ScriptCore {
             base_core_reader.get_crosscom(),
             base_core_reader.get_config().get_product_serials(),
             Arc::clone(&self.global_script_variables),
+            self.get_thread_keys(),
         )? {
             context.install(module)?;
         }
@@ -368,5 +373,10 @@ impl ScriptCore {
 
         let cstr = CString::new(data_string.to_owned()).ok()?;
         Some(cstr.into_raw() as *const i64)
+    }
+
+    /// Returns `self.thread_keys`.
+    pub fn get_thread_keys(&self) -> Arc<DashMap<String, bool>> {
+        Arc::clone(&self.thread_keys)
     }
 }
