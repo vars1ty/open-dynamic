@@ -39,6 +39,7 @@ thread_safe_structs!(BaseCore);
 impl BaseCore {
     /// Initializes everything needed.
     pub fn init() -> Self {
+        Self::start_deadlock_detection();
         let config: &'static Config = Box::leak(Box::default());
         let use_local_server = config.get_use_local_server();
         let main_serial = Box::leak(Box::new(
@@ -135,6 +136,31 @@ impl BaseCore {
                 crash!("[ERROR] Failed connecting to the server, perhaps your serial is incorrect, or the server is down?");
             }
         }
+    }
+
+    /// Starts `parking_lot`'s experimental deadlock detection.
+    fn start_deadlock_detection() {
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            let deadlocks = parking_lot::deadlock::check_deadlock();
+            if deadlocks.is_empty() {
+                continue;
+            }
+
+            for (i, threads) in deadlocks.iter().enumerate() {
+                log!("[ERROR] Deadlock detected! Index: #", i);
+                for thread in threads {
+                    log!(
+                        "[DEADLOCK] Thread Id {:#?}",
+                        format!("{:#?}", thread.thread_id())
+                    );
+                    log!(
+                        "[DEADLOCK] Backtrace: {:#?}",
+                        format!("{:#?}", thread.backtrace())
+                    );
+                }
+            }
+        });
     }
 
     /// Returns the cached config instance.
