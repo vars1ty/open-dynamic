@@ -40,7 +40,6 @@ thread_safe_structs!(BaseCore);
 impl BaseCore {
     /// Initializes everything needed.
     pub fn init() -> Self {
-        Self::start_deadlock_detection();
         let config: &'static Config = Box::leak(Box::default());
         let use_local_server = config.get_use_local_server();
         let main_serial = Box::leak(Box::new(
@@ -142,10 +141,15 @@ impl BaseCore {
         }
     }
 
-    /// Starts `parking_lot`'s experimental deadlock detection.
+    /// Tries starting `parking_lot`'s experimental deadlock detection.
     /// This also uses a static `Once` instance, ensuring that if it is somehow called twice, it
     /// won't execute the main logic more than once.
-    fn start_deadlock_detection() {
+    /// If `detect_deadlocks` in the config is `false`, then this will do nothing.
+    pub fn try_start_deadlock_detection(&self) {
+        if !self.get_config().get_detect_deadlocks() {
+            return;
+        }
+
         static START_ONCE: Once = Once::new();
         START_ONCE.call_once(|| {
             std::thread::spawn(move || loop {
@@ -159,12 +163,11 @@ impl BaseCore {
                 for (i, threads) in deadlocks.iter().enumerate() {
                     log!("[ERROR] Deadlock detected, report it to #assistance!", i);
                     for thread in threads {
-                        crash_log.push_zstring(zencstr!("Deadlock ID: ", i, "\n"));
                         crash_log.push_zstring(zencstr!(
-                            "Thread ID: ",
-                            format!("{:#?}\n", thread.thread_id())
-                        ));
-                        crash_log.push_zstring(zencstr!(
+                            "Deadlock ID: ",
+                            i,
+                            "\nThread ID: ",
+                            format!("{:#?}\n", thread.thread_id()),
                             "Backtrace: ",
                             format!("{:#?}\n", thread.backtrace())
                         ));

@@ -23,6 +23,9 @@ pub struct Config {
 
     /// Custom product serials.
     serials: Arc<Vec<String>>,
+
+    /// Whether or not deadlocks should be checked for.
+    detect_deadlocks: bool,
 }
 
 thread_safe_structs!(Config);
@@ -76,10 +79,15 @@ impl Default for Config {
             })
             .collect::<Vec<_>>();
 
+        let detect_deadlocks = cached_config_ref[&zencstr!("detect_deadlocks").data]
+            .as_bool()
+            .unwrap_or(true);
+
         Self {
             cached_config,
             path: dir_path.leak(),
             serials: Arc::new(serials),
+            detect_deadlocks,
         }
     }
 }
@@ -209,15 +217,15 @@ impl Config {
     /// Gets the main font size.
     pub fn get_main_font_size(&self) -> f32 {
         self.get()[&zencstr!("main_font_size").data]
-            .as_f64()
-            .unwrap_or(18.0) as f32
+            .as_u64()
+            .unwrap_or(18) as f32
     }
 
     /// Gets the header font size.
     pub fn get_header_font_size(&self) -> f32 {
         self.get()[&zencstr!("header_font_size").data]
-            .as_f64()
-            .unwrap_or(26.0) as f32
+            .as_u64()
+            .unwrap_or(26) as f32
     }
 
     /// Gets the list of custom fonts to be added onto the UI.
@@ -231,11 +239,11 @@ impl Config {
                 "[ERROR] \"fonts\" couldn't be turned into an object!"
             ))
         {
-            let Some(font_size) = font_size.as_f64() else {
+            let Some(font_size) = font_size.as_u64() else {
                 log!(
                     "[ERROR] Font Size of font at ",
                     relative_font_path,
-                    " isn't a valid f32 nor f64 and will therefore not be added!"
+                    " isn't a valid u64 and will therefore not be added!"
                 );
                 continue;
             };
@@ -262,5 +270,10 @@ impl Config {
         self.get()[&zencstr!("use_new_rune_thread").data]
             .as_bool()
             .unwrap_or(true)
+    }
+
+    /// Whether or not deadlocks should be checked for.
+    pub const fn get_detect_deadlocks(&self) -> bool {
+        self.detect_deadlocks
     }
 }

@@ -93,6 +93,7 @@ fn hook(hmodule: HINSTANCE) {
     log!("Initializing Base Core...");
     let base_core = Arc::new(RwLock::new(BaseCore::init()));
     let base_core_reader = base_core.read();
+    base_core_reader.try_start_deadlock_detection();
     log!("Base Core initialized, hooking...");
 
     // If `free_console` is `true` and there's an allocated console, free the console.
