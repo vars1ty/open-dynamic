@@ -7,7 +7,6 @@ use crate::{
         scripting::{arctic::Arctic, script_modules::UIModules},
     },
 };
-use ahash::AHashMap;
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{
@@ -36,9 +35,7 @@ pub struct ScriptCore {
     /// All compiled scripts with their own VM instance.
     /// Key being the script content hashed, value being the VM inside of `VMWrapper`.
     /// Key is hashed to prevent finding it in memory, and it doesn't need to be plain-text.
-    /// This is a Mutex so we don't lock the entire script engine all at once whenever we try and
-    /// access individual parts of it.
-    compiled_scripts: Arc<Mutex<AHashMap<String, VMWrapper>>>,
+    compiled_scripts: Arc<DashMap<String, VMWrapper>>,
 
     /// Modules installed outside of dynamic.
     cross_modules: Mutex<Vec<Module>>,
@@ -154,7 +151,6 @@ impl ScriptCore {
             return;
         }
 
-        let hash = source.get_hash();
         let Some(reader) = base_core.try_read() else {
             log!("[ERROR] Compilation failed because BaseCore is locked!");
             return;
@@ -164,21 +160,13 @@ impl ScriptCore {
             || force_new_thread
             || source.contains(self.compiler_special_settings[0]);
 
-        let Some(mut compiled_scripts) = self.compiled_scripts.try_lock() else {
-            log!("[ERROR] Compilation failed because Compiled Scripts is locked!");
-            log!(
-                "[INFO] This is common if you are already running a script, as it has to complete before you can continue."
-            );
-            return;
-        };
-
         let source = self
             .add_imports(&source, reader.get_config().get_path())
             .unwrap_or(source);
 
-        if compiled_scripts.get(&hash).is_some() {
+        let hash = source.get_hash();
+        if self.compiled_scripts.get(&hash).is_some() {
             let crosscom = reader.get_crosscom();
-            drop(compiled_scripts);
             drop(reader);
 
             // Cached, run the main function without compiling.
@@ -190,9 +178,8 @@ impl ScriptCore {
         let compile = self.compile(&source, Arc::clone(&base_core));
         if let Ok(vm) = compile {
             // Uncached source. Compile, store and run the main function.
-            compiled_scripts.insert(hash, VMWrapper(vm));
+            self.compiled_scripts.insert(hash, VMWrapper(vm));
             let crosscom = reader.get_crosscom();
-            drop(compiled_scripts);
             drop(reader);
 
             // Run main and print the elapsed time.
@@ -224,11 +211,8 @@ impl ScriptCore {
     ) {
         let compiled_scripts = Arc::clone(&self.compiled_scripts);
         let code = move || {
-            let compiled_scripts = compiled_scripts.try_lock();
-            let Some(vm) = compiled_scripts
-                .as_ref()
-                .and_then(|compiled_scripts| compiled_scripts.get(&source.get_hash()))
-            else {
+            let compiled_scripts_clone = Arc::clone(&compiled_scripts);
+            let Some(vm) = compiled_scripts_clone.get(&source.get_hash()) else {
                 return;
             };
 
