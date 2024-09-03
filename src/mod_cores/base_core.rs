@@ -153,7 +153,7 @@ impl BaseCore {
         static START_ONCE: Once = Once::new();
         START_ONCE.call_once(|| {
             std::thread::spawn(move || loop {
-                std::thread::sleep(std::time::Duration::from_secs(2));
+                std::thread::sleep(std::time::Duration::from_secs(5));
                 let deadlocks = parking_lot::deadlock::check_deadlock();
                 if deadlocks.is_empty() {
                     continue;
@@ -174,6 +174,7 @@ impl BaseCore {
                     }
                 }
 
+                drop(deadlocks);
                 crash!(
                     "[ERROR] Deadlock detected, crash log to send in #assistance:\n",
                     crash_log,

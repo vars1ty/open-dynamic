@@ -177,6 +177,11 @@ impl SystemModules {
             .build()?;
         memory_module
             .function("free_cstring", |ptr: i64| {
+                if ptr == 0 {
+                    log!("[ERROR] free_cstring called with nullptr, cancelling.");
+                    return;
+                }
+
                 drop(unsafe { CString::from_raw(ptr as _) });
             })
             .build()?;
@@ -587,37 +592,35 @@ impl UIModules {
         let mut module = Module::with_crate(&zencstr!("ui").data)?; // <-- TODO: Rename to `UI`.
 
         module
-            .function("add_window", move |name| {
-                custom_window_utils.add_window(name)
-            })
+            .function("add_window", |name| custom_window_utils.add_window(name))
             .build()?;
 
         module
-            .function("remove_window", move |name| {
+            .function("remove_window", |name| {
                 custom_window_utils.remove_window(name)
             })
             .build()?;
 
         module
-            .function("rename_window", move |from_name, to_name| {
+            .function("rename_window", |from_name, to_name| {
                 custom_window_utils.rename_window(from_name, to_name)
             })
             .build()?;
 
         module
-            .function("focus_window", move |name| {
+            .function("focus_window", |name| {
                 custom_window_utils.set_current_window_to(name)
             })
             .build()?;
 
         module
-            .function("add_label", move |identifier, content| {
+            .function("add_label", |identifier, content| {
                 custom_window_utils.add_widget(identifier, WidgetType::Label(content, 0))
             })
             .build()?;
 
         module
-            .function("add_bold_label", move |identifier, content| {
+            .function("add_bold_label", |identifier, content| {
                 custom_window_utils.add_widget(identifier, WidgetType::Label(content, 2));
             })
             .build()?;
@@ -625,7 +628,7 @@ impl UIModules {
         module
             .function(
                 "add_custom_font_label",
-                move |identifier, content, relative_font_path| {
+                |identifier, content, relative_font_path| {
                     custom_window_utils.add_widget(
                         identifier,
                         WidgetType::LabelCustomFont(content, Arc::new(relative_font_path)),
@@ -635,19 +638,16 @@ impl UIModules {
             .build()?;
 
         module
-            .function(
-                "add_button",
-                move |identifier, text, function, opt_param| {
-                    custom_window_utils.add_widget(
-                        identifier,
-                        WidgetType::Button(text, Rc::new(function), opt_param),
-                    )
-                },
-            )
+            .function("add_button", |identifier, text, function, opt_param| {
+                custom_window_utils.add_widget(
+                    identifier,
+                    WidgetType::Button(text, Rc::new(function), opt_param),
+                )
+            })
             .build()?;
 
         module
-            .function("add_legacy_button", move |identifier, text, rune_code| {
+            .function("add_legacy_button", |identifier, text, rune_code| {
                 log!("[WARN] Legacy buttons will be removed in the future!");
                 custom_window_utils
                     .add_widget(identifier, WidgetType::LegacyButton(text, rune_code))
@@ -655,63 +655,63 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_separator", move |identifier| {
+            .function("add_separator", |identifier| {
                 custom_window_utils.add_widget(identifier, WidgetType::Separator)
             })
             .build()?;
 
         module
-            .function("add_spacing", move |identifier, x, y| {
+            .function("add_spacing", |identifier, x, y| {
                 custom_window_utils.add_widget(identifier, WidgetType::Spacing(x, y))
             })
             .build()?;
 
         module
-            .function("add_f32_slider", move |identifier, text, min, max| {
+            .function("add_f32_slider", |identifier, text, min, max| {
                 custom_window_utils
                     .add_widget(identifier, WidgetType::F32Slider(text, min, max, min))
             })
             .build()?;
 
         module
-            .function("add_i32_slider", move |identifier, text, min, max| {
+            .function("add_i32_slider", |identifier, text, min, max| {
                 custom_window_utils
                     .add_widget(identifier, WidgetType::I32Slider(text, min, max, min))
             })
             .build()?;
 
         module
-            .function("get_f32_slider_value", move |identifier| {
+            .function("get_f32_slider_value", |identifier| {
                 custom_window_utils.get_f32_slider_value(identifier)
             })
             .build()?;
 
         module
-            .function("get_i32_slider_value", move |identifier| {
+            .function("get_i32_slider_value", |identifier| {
                 custom_window_utils.get_i32_slider_value(identifier)
             })
             .build()?;
 
         module
-            .function("remove_widget", move |identifier| {
+            .function("remove_widget", |identifier| {
                 custom_window_utils.remove_widget(identifier)
             })
             .build()?;
 
         module
-            .function("remove_all_widgets", move || {
+            .function("remove_all_widgets", || {
                 custom_window_utils.remove_all_widgets()
             })
             .build()?;
 
         module
-            .function("set_next_item_width", move |identifier, width| {
+            .function("set_next_item_width", |identifier, width| {
                 custom_window_utils.add_widget(identifier, WidgetType::NextWidgetWidth(width))
             })
             .build()?;
 
         module
-            .function("set_next_item_same_line", move |identifier| {
+            .function("set_next_item_same_line", |identifier| {
                 custom_window_utils.add_widget(identifier, WidgetType::SameLine)
             })
             .build()?;
@@ -719,7 +719,7 @@ impl UIModules {
         module
             .function(
                 "add_image",
-                move |identifier, image_path, width, height, rune_code| {
+                |identifier, image_path, width, height, rune_code| {
                     custom_window_utils.add_widget(
                         identifier,
                         WidgetType::Image(image_path, width, height, false, false, rune_code),
@@ -731,7 +731,7 @@ impl UIModules {
         module
             .function(
                 "add_image_overlay",
-                move |identifier, image_path, width, height| {
+                |identifier, image_path, width, height| {
                     custom_window_utils.add_widget(
                         identifier,
                         WidgetType::Image(image_path, width, height, true, false, "".to_owned()),
@@ -743,7 +743,7 @@ impl UIModules {
         module
             .function(
                 "add_image_background",
-                move |identifier, image_path, width, height| {
+                |identifier, image_path, width, height| {
                     custom_window_utils.add_widget(
                         identifier,
                         WidgetType::Image(image_path, width, height, false, true, "".to_owned()),
@@ -755,44 +755,44 @@ impl UIModules {
         module
             .function(
                 "replace_image",
-                move |identifier, new_image_path, width, height| {
+                |identifier, new_image_path, width, height| {
                     custom_window_utils.replace_image(identifier, new_image_path, [width, height])
                 },
             )
             .build()?;
 
         module
-            .function("set_size_constraints", move |min_x, min_y, max_x, max_y| {
+            .function("set_size_constraints", |min_x, min_y, max_x, max_y| {
                 custom_window_utils.set_active_window_size_constraints([min_x, min_y, max_x, max_y])
             })
             .build()?;
 
         module
-            .function("clear_cached_images", move || {
+            .function("clear_cached_images", || {
                 custom_window_utils.clear_cached_images()
             })
             .build()?;
 
         module
-            .function("get_current_window_data", move || {
+            .function("get_current_window_data", || {
                 custom_window_utils.get_current_window_data()
             })
             .build()?;
 
         module
-            .function("hide_widgets", move |identifiers| {
-                custom_window_utils.hide_widgets(Arc::new(identifiers))
+            .function("hide_widgets", |identifiers| {
+                custom_window_utils.hide_widgets(identifiers)
             })
             .build()?;
 
         module
-            .function("show_widgets", move |identifiers| {
-                custom_window_utils.show_widgets(Arc::new(identifiers))
+            .function("show_widgets", |identifiers| {
+                custom_window_utils.show_widgets(identifiers)
             })
             .build()?;
 
         module
-            .function("add_centered_widget_group", move |identifier, custom_y| {
+            .function("add_centered_widget_group", |identifier, custom_y| {
                 custom_window_utils.add_widget(
                     identifier,
                     WidgetType::CenteredWidgets(IndexMap::new(), custom_y, [0.0, 0.0]),
@@ -801,7 +801,7 @@ impl UIModules {
             .build()?;
 
         module
-            .function("set_auto_center_into", move |identifier| {
+            .function("set_auto_center_into", |identifier| {
                 custom_window_utils.set_widget_auto_centered_into(identifier)
             })
             .build()?;
@@ -809,7 +809,7 @@ impl UIModules {
         module
             .function(
                 "add_input_text_multiline",
-                move |identifier, label, width, height| {
+                |identifier, label, width, height| {
                     custom_window_utils.add_widget(
                         identifier,
                         WidgetType::InputTextMultiLine(label, String::default(), width, height),
@@ -819,13 +819,13 @@ impl UIModules {
             .build()?;
 
         module
-            .function("get_input_text_multiline_value", move |identifier| {
+            .function("get_input_text_multiline_value", |identifier| {
                 custom_window_utils.get_input_text_multiline_value(identifier)
             })
             .build()?;
 
         module
-            .function("retain_widgets_by_identifiers", move |identifiers| {
+            .function("retain_widgets_by_identifiers", |identifiers| {
                 custom_window_utils.retain_widgets_by_identifiers(identifiers)
             })
             .build()?;

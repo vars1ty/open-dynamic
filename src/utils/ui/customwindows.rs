@@ -747,7 +747,7 @@ impl CustomWindowsUtils {
     }
 
     /// Hides a set of widgets by their identifiers from all windows.
-    pub fn hide_widgets(&self, identifiers: Arc<Vec<String>>) {
+    pub fn hide_widgets(&self, identifiers: Vec<String>) {
         let Some(mut hidden_widgets) = self.hidden_widgets.try_lock() else {
             return;
         };
@@ -760,7 +760,7 @@ impl CustomWindowsUtils {
     }
 
     /// If the defined widgets are hidden, they'll then be shown again.
-    pub fn show_widgets(&self, identifiers: Arc<Vec<String>>) {
+    pub fn show_widgets(&self, identifiers: Vec<String>) {
         let Some(mut hidden_widgets) = self.hidden_widgets.try_lock() else {
             return;
         };
