@@ -7,7 +7,7 @@ use crate::{
 use dashmap::DashMap;
 use hudhook::imgui::{self, internal::DataTypeKind, sys::*, *};
 use parking_lot::RwLock;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use windows::Win32::Foundation::POINT;
 
 #[derive(Default)]
@@ -330,15 +330,27 @@ impl ImGuiUtils {
         content_frame_data: &mut ContentFrameData,
         content: C,
     ) {
+        // A vector of pre-allocated Strings, so we don't always re-allocate every frame for
+        // ui.columns.
+        static INDEX_STRINGS: LazyLock<Vec<String>> = LazyLock::new(|| {
+            let mut vec = Vec::with_capacity(32);
+            for i in 0..vec.capacity() {
+                vec.insert(i, i.to_string());
+            }
+
+            vec
+        });
         static FRAMES_PER_COLUMN: usize = 3;
 
         // This padding is applied both left and right of the content group. If the rows are
         // stacked, it's then also used to add a bit of vertical space between them.
         static PADDING: f32 = 5.0;
 
-        let title_heap = title.to_owned();
-        if !content_frame_data.titles.contains(&title_heap) {
-            content_frame_data.titles.push(title_heap);
+        {
+            let title_heap = title.to_owned();
+            if !content_frame_data.titles.contains(&title_heap) {
+                content_frame_data.titles.push(title_heap);
+            }
         }
 
         let current_index = content_frame_data
@@ -353,7 +365,11 @@ impl ImGuiUtils {
                 ui.columns(1, "", false);
             }
 
-            ui.columns(FRAMES_PER_COLUMN as i32, current_index.to_string(), false);
+            ui.columns(
+                FRAMES_PER_COLUMN as i32,
+                &INDEX_STRINGS[current_index],
+                false,
+            );
         }
 
         ui.group(|| {
