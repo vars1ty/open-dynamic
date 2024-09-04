@@ -1,3 +1,6 @@
+use std::fmt::Display;
+use zstring::ZString;
+
 /// Basic string utils.
 pub struct StringUtils;
 
@@ -38,7 +41,7 @@ impl StringUtils {
         for i in (0..hex_string.len()).step_by(2) {
             // Parse two characters as a hexadecimal number. If successful, add the byte.
             let Ok(byte) = u8::from_str_radix(&hex_string[i..i + 2], 16) else {
-                log!("[ERROR] u8 at ", i, " cannot be turned into a safe byte!");
+                log!("[ERROR] u8 at ", i, " cannot be turned into a byte!");
                 return None;
             };
 
@@ -65,5 +68,15 @@ impl StringUtils {
                 slice.copy_from_slice(&replacement);
             }
         }
+    }
+
+    /// Helper for `crash!()` with multiple parameters.
+    /// Takes the mutable ZString message and appends `encrypted_arg` at the back of it, reducing
+    /// the need for 3 lines of extra code for each additional parameter, down to 1.
+    #[inline(never)]
+    pub fn crash_helper_append(message: &mut ZString, encrypted_arg: impl Display) {
+        let arg_content = ZString::new(encrypted_arg.to_string());
+        print!("{arg_content}");
+        message.push_zstring(arg_content);
     }
 }

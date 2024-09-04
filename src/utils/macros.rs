@@ -42,7 +42,7 @@ macro_rules! zencstr {
         {
             let mut output = $crate::zstring::ZString::default();
             $(
-                output.data += &encrypt_arg!($arg).to_string();
+                output.push_zstring($crate::zstring::ZString::new(encrypt_arg!($arg).to_string()));
             )*
             output
         }
@@ -62,9 +62,7 @@ macro_rules! crash {
             print!("{}", zencstr!("[", file!(), ":", line!(), "]: "));
             let mut message = $crate::zstring::ZString::default();
             $(
-                let arg_content = format!("{}", encrypt_arg!($arg));
-                print!("{arg_content}");
-                message.data += &arg_content;
+                $crate::utils::stringutils::StringUtils::crash_helper_append(&mut message, encrypt_arg!($arg));
             )*
             println!();
             $crate::winutils::WinUtils::display_message_box(&zencstr!("dynamic").data, &message.data, 0x00000010);
