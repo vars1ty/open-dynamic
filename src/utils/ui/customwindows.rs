@@ -41,7 +41,7 @@ pub struct WindowData {
 #[derive(Default)]
 pub struct CustomWindowsUtils {
     /// Titles for each custom window.
-    window_titles: RwLock<Vec<String>>,
+    window_titles: RefCell<Vec<String>>,
 
     /// Widgets for each window.
     #[allow(clippy::type_complexity)] // Ignore because it's complex.
@@ -95,7 +95,7 @@ impl CustomWindowsUtils {
 
     /// Draws all of the custom windows.
     pub fn draw_custom_windows(&self, ui: &imgui::Ui, base_core: Arc<RwLock<BaseCore>>) {
-        let Some(window_titles) = self.window_titles.try_read() else {
+        let Ok(window_titles) = self.window_titles.try_borrow() else {
             return;
         };
 
@@ -148,7 +148,7 @@ impl CustomWindowsUtils {
         ui: &imgui::Ui,
         window_index: usize,
     ) {
-        let Some(widgets) = widgets.try_borrow().ok() else {
+        let Ok(widgets) = widgets.try_borrow() else {
             return;
         };
 
@@ -334,7 +334,7 @@ impl CustomWindowsUtils {
 
     /// Changes the currently selected window.
     pub fn set_current_window_to(&self, window: String) {
-        let Some(window_titles) = self.window_titles.try_read() else {
+        let Ok(window_titles) = self.window_titles.try_borrow() else {
             log!("[ERROR] window_titles is locked, cannot swap window focus!");
             return;
         };
@@ -352,7 +352,7 @@ impl CustomWindowsUtils {
 
     /// Adds a new custom window.
     pub fn add_window(&self, title: String) {
-        let Some(mut window_titles) = self.window_titles.try_write() else {
+        let Ok(mut window_titles) = self.window_titles.try_borrow_mut() else {
             return;
         };
 
@@ -380,7 +380,7 @@ impl CustomWindowsUtils {
 
     /// Attempts to remove a custom window.
     pub fn remove_window(&self, title: String) {
-        let Some(mut window_titles) = self.window_titles.try_write() else {
+        let Ok(mut window_titles) = self.window_titles.try_borrow_mut() else {
             return;
         };
 
@@ -417,7 +417,7 @@ impl CustomWindowsUtils {
 
     /// Attempts to rename a custom window.
     pub fn rename_window(&self, from: String, to: String) {
-        let Some(mut window_titles) = self.window_titles.try_write() else {
+        let Ok(mut window_titles) = self.window_titles.try_borrow_mut() else {
             return;
         };
 
@@ -732,11 +732,15 @@ impl CustomWindowsUtils {
     /// Gets the window data for the currently focused window, if any.
     /// If there are no windows, `WindowData::default()` is returned.
     pub fn get_current_window_data(&self) -> WindowData {
-        let Some(window_titles) = self.window_titles.try_read() else {
+        let Ok(window_titles) = self.window_titles.try_borrow() else {
+            log!(
+                "[ERROR] window_titles is already being borrowed, returning WindowData::default()!"
+            );
             return WindowData::default();
         };
 
         if window_titles.is_empty() {
+            log!("[ERROR] There are no custom windows, returning WindowData::default()!");
             return WindowData::default();
         }
 
@@ -798,6 +802,7 @@ impl CustomWindowsUtils {
             return;
         };
 
+        drop(reader);
         for module_name in injected_dlls.values() {
             let Some(func) = WinUtils::get_module_symbol_address(module_name, c"on_ui_update")
             else {

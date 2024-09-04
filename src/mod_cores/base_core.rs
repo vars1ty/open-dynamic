@@ -128,7 +128,7 @@ impl BaseCore {
                 drop(reader);
                 drop(instance);
 
-                let mut prompt = Prompter::new("[PROMPT] Write 'r' to try and re-connect. Write any other response to close dynamic.", smallvec!["R", "r"]);
+                let mut prompt = Prompter::new("[PROMPT] Write 'r' to try and re-connect. Write any other response to close dynamic.", vec!["R", "r"]);
                 if prompt.prompt().is_some() {
                     log!("[PROMPT] Trying to connect again...");
                     drop(prompt);

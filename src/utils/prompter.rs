@@ -1,22 +1,21 @@
-use smallvec::SmallVec;
 use zstring::ZString;
 
 /// Basic CLI Prompter.
 pub struct Prompter<'a> {
     message: &'a str,
-    valid_responses: Option<SmallVec<[&'a str; 4]>>,
+    valid_responses: Option<Vec<&'a str>>,
 }
 
 /// Prompt result.
 pub struct PromptResult {
     pub prompt: ZString,
-    pub args: SmallVec<[String; 4]>,
+    pub args: Vec<String>,
 }
 
 impl<'a> Prompter<'a> {
     /// Creates a new prompt which only classifies certain responses as valid.
     #[allow(unused)]
-    pub fn new(message: &'a str, valid_responses: SmallVec<[&'a str; 4]>) -> Self {
+    pub fn new(message: &'a str, valid_responses: Vec<&'a str>) -> Self {
         Self {
             message,
             valid_responses: Some(valid_responses),
@@ -44,14 +43,14 @@ impl<'a> Prompter<'a> {
         input.data = input.data.replace(['\n', '\r'], "");
 
         // Collect all args, if any.
-        let mut args: SmallVec<[String; 4]> = if input.data.contains(' ') {
+        let mut args: Vec<String> = if input.data.contains(' ') {
             input
                 .data
                 .split_whitespace()
                 .map(|str| str.to_owned())
                 .collect()
         } else {
-            smallvec![input.data.to_owned()]
+            vec![input.data.to_owned()]
         };
 
         // The prompt is the first argument, no need for cloning it since we can just take the

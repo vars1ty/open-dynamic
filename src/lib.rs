@@ -1,8 +1,6 @@
 #![feature(stmt_expr_attributes)]
 #![feature(optimize_attribute)]
 #![feature(c_variadic)]
-#[macro_use]
-extern crate smallvec;
 
 #[macro_use]
 extern crate obfstr;
@@ -33,7 +31,6 @@ use hudhook::{
     Hudhook,
 };
 use parking_lot::RwLock;
-use smallvec::SmallVec;
 use std::{
     ffi::c_void,
     io::IsTerminal,
@@ -224,7 +221,7 @@ fn setup_generic_hooks() -> (GenericHoooks, Arc<AtomicBool>) {
 }
 
 /// Called when a console command should be looked up and executed, after everything's initialized.
-fn on_console_command(prompt: &str, args: SmallVec<[String; 4]>, base_core: Arc<RwLock<BaseCore>>) {
+fn on_console_command(prompt: &str, args: Vec<String>, base_core: Arc<RwLock<BaseCore>>) {
     match prompt {
         "free_console" => {
             log!(

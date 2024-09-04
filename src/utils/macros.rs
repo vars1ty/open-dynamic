@@ -54,7 +54,7 @@ macro_rules! zencstr {
 macro_rules! crash {
     ($arg:literal) => {{
         log!($arg);
-        $crate::winutils::WinUtils::display_message_box(&zencstr!("Error").data, &encrypt_arg!($arg), 0x00000010);
+        $crate::winutils::WinUtils::display_message_box(&zencstr!("dynamic").data, &encrypt_arg!($arg), 0x00000010);
         $crate::winutils::WinUtils::sleep_and_exit(5)
     }};
     ($($arg:expr),*) => {
@@ -67,7 +67,7 @@ macro_rules! crash {
                 message.data += &arg_content;
             )*
             println!();
-            $crate::winutils::WinUtils::display_message_box(&zencstr!("Error").data, &message.data, 0x00000010);
+            $crate::winutils::WinUtils::display_message_box(&zencstr!("dynamic").data, &message.data, 0x00000010);
             $crate::winutils::WinUtils::sleep_and_exit(5)
         }
     };
