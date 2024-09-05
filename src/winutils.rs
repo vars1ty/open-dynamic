@@ -24,6 +24,11 @@ use windows::{
 use wmem::Memory;
 use zstring::ZString;
 
+extern "system" {
+    pub fn AllocConsole() -> i32;
+    pub fn FreeConsole() -> i32;
+}
+
 /// Renderer enum for determing the render target for an unsupported game.
 #[derive(Debug, Default)]
 pub enum Renderer {

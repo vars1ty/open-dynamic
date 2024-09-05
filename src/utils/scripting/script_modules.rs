@@ -27,7 +27,7 @@ use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},
 };
-use windows::Win32::System::{Console::AllocConsole, Threading::GetCurrentProcess};
+use windows::Win32::System::Threading::GetCurrentProcess;
 use wmem::Memory;
 
 /// System modules, like Memory operations and such.
@@ -131,9 +131,6 @@ impl SystemModules {
             .function("show_alert", |caption: String, text: String| {
                 WinUtils::display_message_box(&caption, &text, 0x00000010)
             })
-            .build()?;
-        windows_module
-            .function("alloc_console", || unsafe { AllocConsole().is_ok() })
             .build()?;
         windows_module
             .function("get_base_of_module", |module_name: String| {

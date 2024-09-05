@@ -1,12 +1,11 @@
 use crate::mod_cores::base_core::BaseCore;
-use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, extensions::OptionExt};
+use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils};
 use crate::winutils::WinUtils;
-use ahash::AHashMap;
 use dashmap::DashMap;
 use hudhook::imgui::{self, Condition, TextureId};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use rune::{Any, Value};
+use rune::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{
     cell::{Cell, RefCell},
@@ -16,7 +15,8 @@ use std::{
 use windows::Win32::Foundation::POINT;
 use zstring::ZString;
 
-// FIXME: Use IndexMap.
+// Refactor: Remove RefCell to see if it's really needed due to DashMap allowing for `get_mut`
+// without a mutable reference.
 type WidgetsMap = IndexMap<String, Rc<RefCell<WidgetType>>>;
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
@@ -40,6 +40,7 @@ pub struct CustomWindowsUtils {
     cached_images: DashMap<String, Option<TextureId>>,
 
     /// Current cursor point.
+    /// Allowed to be non-thread-safe as it doesn't matter.
     point: Cell<POINT>,
 
     /// Widgets that should remain hidden.
@@ -87,11 +88,11 @@ impl CustomWindowsUtils {
         static DEFAULT_SIZE: [f32; 2] = [600.0, 200.0];
 
         for (index, custom_window) in window_titles.iter().enumerate() {
-            let Some(Some(widgets)) = window_titles
+            let Some(widgets) = window_titles
                 .iter()
                 .enumerate()
                 .find(|(_, window_title)| *window_title == custom_window)
-                .map(|(found_index, _)| self.window_widgets.get(&found_index))
+                .and_then(|(found_index, _)| self.window_widgets.get(&found_index))
             else {
                 continue;
             };
@@ -504,11 +505,20 @@ impl CustomWindowsUtils {
                 return Some(Rc::clone(widget));
             }
 
+            let Ok(widget) = widget.try_borrow() else {
+                log!(
+                    "[ERROR] Failed to borrow widget \"",
+                    widget_identifier,
+                    "\", cannot safely return widget!"
+                );
+                return None;
+            };
+
             // Otherwise, check if the widget is CenteredWidgets and scan the widgets inside of
             // it. If found, return it.
             // This won't work with nested CenteredWidgets, but that's frowned upon and
             // shouldn't be accounted for regardless.
-            let WidgetType::CenteredWidgets(widgets, _, _) = &*widget.borrow() else {
+            let WidgetType::CenteredWidgets(widgets, _, _) = &*widget else {
                 continue;
             };
 
@@ -734,7 +744,7 @@ impl CustomWindowsUtils {
     }
 
     /// Gets the pending scripts to be executed.
-    pub fn get_pending_scripts(&self) -> &RefCell<Option<Vec<String>>> {
+    pub const fn get_pending_scripts(&self) -> &RefCell<Option<Vec<String>>> {
         &self.pending_scripts
     }
 
