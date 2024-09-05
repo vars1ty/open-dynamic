@@ -417,7 +417,7 @@ impl SystemModules {
             );
         };
 
-        if let Ok(data_i64) = data.to_owned().into_integer().into_result() {
+        if let Ok(data_i64) = data.as_integer().into_result() {
             if let Err(error) = Memory::write(
                 unsafe { &GetCurrentProcess() },
                 address as _,
@@ -430,7 +430,7 @@ impl SystemModules {
             return;
         }
 
-        if let Ok(data_usize) = data.to_owned().into_usize().into_result() {
+        if let Ok(data_usize) = data.as_usize().into_result() {
             if let Err(error) = Memory::write(
                 unsafe { &GetCurrentProcess() },
                 address as _,
@@ -443,7 +443,7 @@ impl SystemModules {
             return;
         }
 
-        if let Ok(data_f64) = data.to_owned().into_float().into_result() {
+        if let Ok(data_f64) = data.as_float().into_result() {
             if let Err(error) = Memory::write(
                 unsafe { &GetCurrentProcess() },
                 address as _,
