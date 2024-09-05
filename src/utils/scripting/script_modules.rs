@@ -778,12 +778,6 @@ impl UIModules {
             .build()?;
 
         module
-            .function("get_current_window_data", || {
-                custom_window_utils.get_current_window_data()
-            })
-            .build()?;
-
-        module
             .function("hide_widgets", |identifiers| {
                 custom_window_utils.hide_widgets(identifiers)
             })

@@ -174,23 +174,23 @@ impl DX11UI {
 
     /// Caches uninitialized textures for custom windows.
     fn load_unitialized_textures(&mut self, render_context: &mut dyn RenderContext) {
-        let Some(mut cached_images) = self.base_core.try_read().and_then(|reader| {
-            reader
-                .get_custom_window_utils()
-                .get_cached_images()
-                .try_borrow_mut()
-                .ok()
-        }) else {
+        let Some(cached_images) = self
+            .base_core
+            .try_read()
+            .map(|reader| reader.get_custom_window_utils().get_cached_images())
+        else {
             return;
         };
 
         // Only get the uninitialized textures.
         let uninitialized_textures = cached_images
             .iter_mut()
-            .filter(|(_, texture_id)| texture_id.is_none());
+            .filter(|entry| entry.value().is_none());
 
-        for (image_path, texture_id) in uninitialized_textures {
+        for mut entry in uninitialized_textures {
+            let image_path = entry.key();
             let image = image::open(image_path);
+
             let Ok(image) = image else {
                 log!(
                     "[ERROR] Failed loading image at path \"",
@@ -218,7 +218,7 @@ impl DX11UI {
                 return;
             };
 
-            *texture_id = Some(loaded_texture_id);
+            *entry.value_mut() = Some(loaded_texture_id);
         }
 
         if self.invalid_textures.is_empty() {

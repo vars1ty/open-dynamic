@@ -4,6 +4,7 @@ use crate::{
     utils::{eguiutils::ImGuiUtils, extensions::OptionExt, scripting::script_modules::*},
     winutils::WinUtils,
 };
+use dashmap::DashMap;
 use dll_syringe::{
     process::{BorrowedProcess, OwnedProcess, ProcessModule},
     Syringe,
@@ -159,13 +160,13 @@ pub struct Arctic {
     base_core: Arc<RwLock<BaseCore>>,
 
     /// All injected DLLs.
-    injected_dlls: Arc<Mutex<HashMap<ProcessModule<BorrowedProcess<'static>>, String>>>,
+    injected_dlls: Arc<DashMap<ProcessModule<BorrowedProcess<'static>>, String>>,
 }
 
 impl Arctic {
     /// Initializes Arctic and returns an instance of `self`.
     pub fn init(base_core: Arc<RwLock<BaseCore>>) -> Self {
-        let injected_dlls = Arc::new(Mutex::new(HashMap::new()));
+        let injected_dlls = Arc::new(DashMap::new());
         let instance = Self {
             cached_functions: {
                 let base_core_reader = base_core
@@ -417,7 +418,7 @@ impl Arctic {
         // Save the DLL and its payload so we remember it.
         let payload = payload
             .unwrap_or_else(|error| crash!("[ERROR] Failed getting payload, error: ", error));
-        self.injected_dlls.lock().insert(payload, dll_name);
+        self.injected_dlls.insert(payload, dll_name);
 
         // Handle function calls from the library.
         func(
@@ -437,11 +438,11 @@ impl Arctic {
     pub fn eject_payload(
         process: OwnedProcess,
         payload: ProcessModule<BorrowedProcess<'static>>,
-        injected_dlls: Arc<Mutex<HashMap<ProcessModule<BorrowedProcess<'static>>, String>>>,
+        injected_dlls: Arc<DashMap<ProcessModule<BorrowedProcess<'static>>, String>>,
     ) {
         std::thread::spawn(move || {
             // Remove the payload from the saved DLLs list.
-            if let Some(removed) = injected_dlls.lock().remove(&payload).take() {
+            if let Some(removed) = injected_dlls.remove(&payload).take() {
                 drop(removed);
             }
 
@@ -459,7 +460,7 @@ impl Arctic {
     /// Gets the injected DLLs.
     pub fn get_injected_dlls(
         &self,
-    ) -> Arc<Mutex<HashMap<ProcessModule<BorrowedProcess<'static>>, String>>> {
+    ) -> Arc<DashMap<ProcessModule<BorrowedProcess<'static>>, String>> {
         Arc::clone(&self.injected_dlls)
     }
 
@@ -481,14 +482,9 @@ impl Arctic {
         reader
             .get_network_listener()
             .hook_on_script_received(crosscom, move |mut source| {
-                let Some(injected_dlls) = injected_dlls.try_lock() else {
-                    log!("[ERROR] Failed locking injected DLLs HashMap, can't call functions!");
-                    return;
-                };
-
-                for module_name in injected_dlls.values() {
+                for module_name in &*injected_dlls {
                     if let Some(func) =
-                        WinUtils::get_module_symbol_address(module_name, c"on_script_received")
+                        WinUtils::get_module_symbol_address(&*module_name, c"on_script_received")
                     {
                         let func: extern "Rust" fn(String) = unsafe { std::mem::transmute(func) };
                         func(std::mem::take(&mut source));
@@ -500,11 +496,7 @@ impl Arctic {
     /// Checks if a gateway/plugin is currently active.
     pub fn is_gateway_active(&self, identifier: String) -> bool {
         self.get_injected_dlls()
-            .try_lock()
-            .map_or(false, |injected_dlls| {
-                injected_dlls
-                    .values()
-                    .any(|module_name| *module_name == identifier)
-            })
+            .iter()
+            .any(|module_name| *module_name == identifier)
     }
 }

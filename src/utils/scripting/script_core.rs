@@ -13,7 +13,7 @@ use rune::{
     termcolor::{ColorChoice, StandardStream},
     *,
 };
-use std::{error::Error, ffi::CString, rc::Rc, sync::Arc};
+use std::{error::Error, ffi::CString, sync::Arc};
 use zstring::ZString;
 
 /// Wrapper around `Value` to force it to be "thread-safe".
