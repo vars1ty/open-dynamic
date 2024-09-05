@@ -501,12 +501,16 @@ impl SystemModules {
         }
 
         unsafe {
-            let read_i8: i8 = std::ptr::read(address as _);
-            let read_i32: i32 = std::ptr::read(address as _);
             let read_i64: i64 = std::ptr::read(address as _);
             let read_f32: f32 = std::ptr::read(address as _);
             let read_f64: f64 = std::ptr::read(address as _);
-            RuneDoubleResultPrimitive::new(read_i8, read_i32, read_i64, read_f32, read_f64)
+            RuneDoubleResultPrimitive::new(
+                read_i64 as i8,
+                read_i64 as i32,
+                read_i64,
+                read_f32,
+                read_f64,
+            )
         }
     }
 
