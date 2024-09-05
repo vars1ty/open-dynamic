@@ -14,8 +14,7 @@ pub struct PromptResult {
 
 impl<'a> Prompter<'a> {
     /// Creates a new prompt which only classifies certain responses as valid.
-    #[allow(unused)]
-    pub fn new(message: &'a str, valid_responses: Vec<&'a str>) -> Self {
+    pub const fn new(message: &'a str, valid_responses: Vec<&'a str>) -> Self {
         Self {
             message,
             valid_responses: Some(valid_responses),
@@ -23,7 +22,7 @@ impl<'a> Prompter<'a> {
     }
 
     /// Creates a new prompt which classifies all responses as valid ones.
-    pub fn new_any_response(message: &'a str) -> Self {
+    pub const fn new_any_response(message: &'a str) -> Self {
         Self {
             message,
             valid_responses: None,

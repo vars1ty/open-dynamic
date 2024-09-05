@@ -65,7 +65,11 @@ impl FNCaller {
                 fn_ptr, params[0], params[1], params[2], params[3], params[4], params[5],
                 params[6], params[7], params[8], params[9],
             ),
-            _ => crash!("[ERROR] Parameter count is unchecked!"),
+            _ => crash!(
+                "[ERROR] Parameter count is unchecked. Got ",
+                params_len,
+                " parameters, expected 10 or less, closing."
+            ),
         }
     }
 

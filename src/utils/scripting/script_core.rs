@@ -13,15 +13,17 @@ use rune::{
     termcolor::{ColorChoice, StandardStream},
     *,
 };
-use std::{error::Error, ffi::CString, sync::Arc};
+use std::{error::Error, ffi::CString, rc::Rc, sync::Arc};
 use zstring::ZString;
 
 /// Wrapper around `Value` to force it to be "thread-safe".
 pub struct ValueWrapper(pub Value);
 thread_safe_structs!(ValueWrapper);
 
-/// Structure that implements Send and Sync so that the `Vm` inside of it can be sent between
-/// threads.
+/// Structure that implements Send and Sync so that the `Vm` inside of it can be used for
+/// `compiled_scripts`.
+/// It is **not** recommended to send the VM instance across threads, instead use `SyncFunction` if
+/// you need to call functions.
 struct VMWrapper(pub Vm);
 thread_safe_structs!(VMWrapper);
 
@@ -209,22 +211,28 @@ impl ScriptCore {
         send_src_to_network: bool,
         use_new_thread: bool,
     ) {
-        let compiled_scripts = Arc::clone(&self.compiled_scripts);
+        let Some(vm) = self.compiled_scripts.get(&source.get_hash()) else {
+            return;
+        };
+
+        let main = vm.0.lookup_function(["main"]);
+        if let Err(error) = main {
+            log!("[ERROR] Compile error when looking up main, error: ", error);
+            return;
+        };
+
+        let main_sync = main.unwrap().into_sync().into_result();
+        if let Err(error) = main_sync {
+            log!(
+                "[ERROR] Failed turning main into a SyncFunction, error: ",
+                error
+            );
+            return;
+        }
+
         let code = move || {
-            let compiled_scripts_clone = Arc::clone(&compiled_scripts);
-            let Some(vm) = compiled_scripts_clone.get(&source.get_hash()) else {
-                return;
-            };
-
-            let main = vm.0.lookup_function(["main"]);
-            if let Err(error) = main {
-                log!("[ERROR] Compile error when looking up main, error: ", error);
-                return;
-            };
-
-            drop(compiled_scripts);
             log!("[Script Engine] Script executing...");
-            let execution = main.unwrap().call::<(), ()>(()).into_result();
+            let execution = main_sync.unwrap().call::<(), ()>(()).into_result();
             if let Err(error) = execution {
                 log!("[ERROR] Compile error when executing main, error: ", error);
                 return;
@@ -290,7 +298,7 @@ impl ScriptCore {
 
             // Valid source usage, process.
             let mut path = ZString::new(config_directory.to_owned());
-            path.data += sourced_file.trim();
+            path.push_zstring(ZString::new(sourced_file.trim()));
             let read = std::fs::read_to_string(&path.data);
             drop(path);
 
@@ -337,15 +345,15 @@ impl ScriptCore {
     /// floating-point numbers.
     /// If a string, the C-String is "forgotten about" and should be dropped manually!
     pub fn value_as_ptr(data: &Value) -> Option<*const i64> {
-        if let Ok(data_i64) = data.to_owned().into_integer().into_result() {
+        if let Ok(data_i64) = data.as_integer().into_result() {
             return Some(data_i64 as *const i64);
         }
 
-        if let Ok(data_usize) = data.to_owned().into_usize().into_result() {
+        if let Ok(data_usize) = data.as_usize().into_result() {
             return Some(data_usize as *const usize as *const i64);
         }
 
-        if let Ok(data_f64) = data.to_owned().into_float().into_result() {
+        if let Ok(data_f64) = data.as_float().into_result() {
             return Some(unsafe {
                 std::mem::transmute::<*const f64, *const i64>(&data_f64 as *const f64)
             });
