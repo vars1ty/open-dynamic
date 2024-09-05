@@ -1,6 +1,7 @@
+use atomic_refcell::AtomicRefCell;
 use indexmap::IndexMap;
 use rune::{runtime::Function, Value};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{rc::Rc, sync::Arc};
 
 /// ImGui widget type.
 #[derive(Clone)]
@@ -16,6 +17,10 @@ pub enum WidgetType {
     NextWidgetWidth(f32),
     SameLine,
     Image(String, f32, f32, bool, bool, String),
-    CenteredWidgets(IndexMap<String, Rc<RefCell<WidgetType>>>, Option<f32>, [f32; 2]),
+    CenteredWidgets(
+        IndexMap<String, Arc<AtomicRefCell<WidgetType>>>,
+        Option<f32>,
+        [f32; 2],
+    ),
     InputTextMultiLine(String, String, f32, f32),
 }

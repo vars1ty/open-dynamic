@@ -1,6 +1,7 @@
 use crate::mod_cores::base_core::BaseCore;
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils};
 use crate::winutils::WinUtils;
+use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
 use hudhook::imgui::{self, Condition, TextureId};
 use indexmap::IndexMap;
@@ -9,15 +10,12 @@ use rune::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{
     cell::{Cell, RefCell},
-    rc::Rc,
     sync::Arc,
 };
 use windows::Win32::Foundation::POINT;
 use zstring::ZString;
 
-// Refactor: Remove RefCell to see if it's really needed due to DashMap allowing for `get_mut`
-// without a mutable reference.
-type WidgetsMap = IndexMap<String, Rc<RefCell<WidgetType>>>;
+type WidgetsMap = IndexMap<String, Arc<AtomicRefCell<WidgetType>>>;
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
 /// instances of them.
@@ -145,7 +143,7 @@ impl CustomWindowsUtils {
         base_core: Arc<RwLock<BaseCore>>,
         ui: &imgui::Ui,
         identifier: &str,
-        widget: &RefCell<WidgetType>,
+        widget: &AtomicRefCell<WidgetType>,
     ) {
         let Ok(mut widget) = widget.try_borrow_mut() else {
             return;
@@ -273,7 +271,7 @@ impl CustomWindowsUtils {
                                 Arc::clone(&base_core),
                                 ui,
                                 identifier,
-                                Rc::make_mut(widget),
+                                Arc::make_mut(widget),
                             );
                         }
                     },
@@ -418,7 +416,7 @@ impl CustomWindowsUtils {
             return;
         };
 
-        window_widgets.insert(identifier, Rc::new(RefCell::new(widget_type)));
+        window_widgets.insert(identifier, Arc::new(AtomicRefCell::new(widget_type)));
     }
 
     /// Adds a widget to a centered widget holder/parent.
@@ -457,7 +455,7 @@ impl CustomWindowsUtils {
                 return;
             }
 
-            widgets.insert(identifier, Rc::new(RefCell::new(widget_type)));
+            widgets.insert(identifier, Arc::new(AtomicRefCell::new(widget_type)));
             return;
         }
     }
@@ -495,14 +493,14 @@ impl CustomWindowsUtils {
     }
 
     /// Gets a widget from a specific window.
-    pub fn get_widget(&self, identifier: &str) -> Option<Rc<RefCell<WidgetType>>> {
+    pub fn get_widget(&self, identifier: &str) -> Option<Arc<AtomicRefCell<WidgetType>>> {
         let window_widgets = self
             .window_widgets
             .get(&self.current_window_index.load(Ordering::Relaxed))?;
         for (widget_identifier, widget) in &*window_widgets {
             // If widget was found outside of a `CenteredWidget` widget, return it.
             if widget_identifier == identifier {
-                return Some(Rc::clone(widget));
+                return Some(Arc::clone(widget));
             }
 
             let Ok(widget) = widget.try_borrow() else {
@@ -526,7 +524,7 @@ impl CustomWindowsUtils {
                 continue;
             };
 
-            return Some(Rc::clone(widget));
+            return Some(Arc::clone(widget));
         }
 
         None
