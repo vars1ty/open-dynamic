@@ -14,19 +14,22 @@ use windows::{
     System::VirtualKey,
     Win32::{
         Foundation::*,
-        Graphics::Gdi::ScreenToClient,
-        System::{
-            Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*, Threading::GetCurrentProcess,
-        },
-        UI::{Input::KeyboardAndMouse::GetAsyncKeyState, WindowsAndMessaging::*},
+        System::{Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*},
     },
 };
 use wmem::Memory;
 use zstring::ZString;
 
+// Manually imported Win32 API functions.
 extern "system" {
     pub fn AllocConsole() -> i32;
     pub fn FreeConsole() -> i32;
+    pub fn GetAsyncKeyState(key: i32) -> i16;
+    pub fn ScreenToClient(hWnd: isize, lpPoint: *mut POINT) -> i32;
+    pub fn GetCursorPos(lpPoint: *mut POINT) -> i32;
+    pub fn GetForegroundWindow() -> isize;
+    pub fn MessageBoxA(hWnd: isize, lpText: *const u8, lpCaption: *const u8, uType: u32) -> i32;
+    pub fn GetCurrentProcess() -> isize;
 }
 
 /// Renderer enum for determing the render target for an unsupported game.
@@ -161,7 +164,7 @@ impl WinUtils {
     /// Not a safe function by design, but not marked as unsafe as it does try and ensure some form
     /// of safety.
     pub fn ptr_to_string(ptr: char_ptr) -> Option<&'static str> {
-        Memory::ptr_to_string(unsafe { &GetCurrentProcess() }, ptr)
+        Memory::ptr_to_string(&HANDLE(unsafe { GetCurrentProcess() }), ptr)
     }
 
     /// Gets a module by its non-exact name.
@@ -365,11 +368,8 @@ impl WinUtils {
     pub fn get_cursor_pos_recycle(point: &mut POINT) {
         unsafe {
             let cursor_pos = GetCursorPos(point);
-            if let Err(error) = cursor_pos {
-                log!(
-                    "[ERROR] Failed to call GetCursorPos, initial value in point remains. Error: ",
-                    error
-                );
+            if cursor_pos == 0 {
+                log!("[ERROR] Failed to call GetCursorPos, initial value in point remains.");
                 return;
             }
 
@@ -444,9 +444,9 @@ impl WinUtils {
         unsafe {
             MessageBoxA(
                 GetForegroundWindow(),
-                PCSTR(text_cstr.as_ptr() as _),
-                PCSTR(caption_cstr.as_ptr() as _),
-                MESSAGEBOX_STYLE(message_type),
+                text_cstr.as_ptr() as _,
+                caption_cstr.as_ptr() as _,
+                message_type,
             )
         };
     }

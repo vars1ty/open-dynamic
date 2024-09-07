@@ -14,7 +14,7 @@ use crate::{
         stringutils::StringUtils,
         ui::customwindows::CustomWindowsUtils,
     },
-    winutils::{AddressType, WinUtils},
+    winutils::{AddressType, GetCurrentProcess, WinUtils},
 };
 use dashmap::DashMap;
 use indexmap::IndexMap;
@@ -27,7 +27,7 @@ use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},
 };
-use windows::Win32::System::Threading::GetCurrentProcess;
+use windows::Win32::Foundation::HANDLE;
 use wmem::Memory;
 
 /// System modules, like Memory operations and such.
@@ -416,7 +416,7 @@ impl SystemModules {
 
         if let Ok(data_i64) = data.as_integer().into_result() {
             if let Err(error) = Memory::write(
-                unsafe { &GetCurrentProcess() },
+                &HANDLE(unsafe { GetCurrentProcess() }),
                 address as _,
                 &(data_i64 as i32),
                 None,
@@ -429,7 +429,7 @@ impl SystemModules {
 
         if let Ok(data_usize) = data.as_usize().into_result() {
             if let Err(error) = Memory::write(
-                unsafe { &GetCurrentProcess() },
+                &HANDLE(unsafe { GetCurrentProcess() }),
                 address as _,
                 &data_usize,
                 None,
@@ -442,7 +442,7 @@ impl SystemModules {
 
         if let Ok(data_f64) = data.as_float().into_result() {
             if let Err(error) = Memory::write(
-                unsafe { &GetCurrentProcess() },
+                &HANDLE(unsafe { GetCurrentProcess() }),
                 address as _,
                 &(data_f64 as f32),
                 None,
@@ -481,7 +481,7 @@ impl SystemModules {
         });
 
         if let Err(error) = Memory::write(
-            unsafe { &GetCurrentProcess() },
+            &HANDLE(unsafe { GetCurrentProcess() }),
             address as _,
             &bytes,
             Some(bytes.len()),

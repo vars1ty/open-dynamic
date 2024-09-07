@@ -2,7 +2,7 @@ use crate::{
     globals::DELTA_TIME,
     mod_cores::base_core::BaseCore,
     utils::{eguiutils::ImGuiUtils, extensions::OptionExt, scripting::script_modules::*},
-    winutils::WinUtils,
+    winutils::{GetCurrentProcess, WinUtils},
 };
 use dashmap::DashMap;
 use dll_syringe::{
@@ -10,14 +10,12 @@ use dll_syringe::{
     Syringe,
 };
 use hudhook::imgui::{FontStackToken, Ui};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use rune::Module;
 use std::{
-    collections::HashMap,
     os::windows::io::FromRawHandle,
     sync::{atomic::Ordering, Arc, OnceLock},
 };
-use windows::Win32::System::Threading::GetCurrentProcess;
 
 /// A structure that contains a set of functions from dynamic.
 #[allow(dead_code)]
@@ -394,7 +392,7 @@ impl Arctic {
             return false;
         }
 
-        let target_process = unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess().0 as _) };
+        let target_process = unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess() as _) };
 
         let payload = Box::leak(Box::new(Syringe::for_process(target_process))).inject(dll_path);
         if let Err(error) = payload {
@@ -422,7 +420,7 @@ impl Arctic {
 
         // Handle function calls from the library.
         func(
-            unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess().0 as _) },
+            unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess() as _) },
             payload,
             Arc::clone(
                 self.cached_functions

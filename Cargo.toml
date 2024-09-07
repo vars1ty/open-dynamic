@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 hudhook = { path = "/home/stackalloc/Git/hudhook", features = [ "dx9", "dx12", "dx11", "opengl3" ], default-features = false }
-windows = { version = "0.51.1", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Diagnostics_ToolHelp", "System", "Win32_System_LibraryLoader", "Win32_UI_Input_KeyboardAndMouse"] }
+windows = { version = "0.51.1", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "System", "Win32_System_LibraryLoader"] }
 retour = { git = "https://github.com/Hpmason/retour-rs.git", features = ["static-detour"] }
 flate2 = { version = "1.0.33", features = ["zlib"], default-features = false }
 parking_lot = { version = "0.12.2", features = ["deadlock_detection"] }
