@@ -36,19 +36,14 @@ use std::{
     io::IsTerminal,
     sync::{atomic::AtomicBool, Arc},
 };
+use tinyapi32::tinyapi32::{AllocConsole, FreeConsole};
 use utils::hooks::GenericHoooks;
-use windows::Win32::Foundation::BOOL;
-use winutils::{AllocConsole, FreeConsole};
 use zstring::ZString;
 
 /// Called when the DLL has been injected/detached.
 #[unsafe(no_mangle)]
 #[allow(non_snake_case, unused_variables)]
-extern "system" fn DllMain(
-    dll_module: HINSTANCE,
-    call_reason: u32,
-    reserved: *const c_void,
-) -> BOOL {
+extern "system" fn DllMain(dll_module: isize, call_reason: u32, reserved: *const c_void) -> i32 {
     std::env::set_var("RUST_BACKTRACE", "full");
     const DLL_PROCESS_ATTACH: u32 = 1;
     const DLL_PROCESS_DETACH: u32 = 0;
@@ -63,11 +58,11 @@ extern "system" fn DllMain(
         _ => (),
     }
 
-    BOOL(1)
+    1
 }
 
 /// Begins initializing and hooking everything.
-fn hook(hmodule: HINSTANCE) {
+fn hook(hmodule: isize) {
     // Allocate a console window.
     let is_terminal = std::io::stdout().is_terminal();
     let allocated = unsafe { AllocConsole() } == 1;
@@ -121,15 +116,15 @@ fn hook(hmodule: HINSTANCE) {
 }
 
 /// Prepares the hooking process and calls `hook_based_on_renderer`.
-fn prepare_hooks(base_core: Arc<RwLock<BaseCore>>, hmodule: HINSTANCE) {
+fn prepare_hooks(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
     log!("Hooking into unknown process, proceed at your own risk!");
     hook_based_on_renderer(Arc::clone(&base_core), hmodule);
 }
 
 /// Intended for `GameTitle::Unknown` where it figures out the renderer and hooks based on the
 /// result.
-fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: HINSTANCE) {
-    let mut builder = Hudhook::builder().with_hmodule(hmodule);
+fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
+    let mut builder = Hudhook::builder().with_hmodule(HINSTANCE(hmodule));
     let base_core_reader = base_core.read();
     let renderer_target = base_core_reader.get_config().get_renderer_target();
     let mut setup_ui = true;

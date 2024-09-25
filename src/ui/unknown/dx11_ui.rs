@@ -14,7 +14,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, OnceLock,
 };
-use windows::Win32::Foundation::POINT;
+use tinyapi32::tinyapi32::POINT;
 
 /// Simple basic ImGui windows, responsible for also drawing custom windows.
 pub struct DX11UI {

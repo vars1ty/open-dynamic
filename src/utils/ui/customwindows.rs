@@ -12,9 +12,13 @@ use std::{
     cell::{Cell, RefCell},
     sync::Arc,
 };
-use windows::Win32::Foundation::POINT;
+use tinyapi32::tinyapi32::POINT;
 use zstring::ZString;
 
+/// # Safety
+/// `WidgetsMap` is wrapped inside of `DashMap<T>` and uses `AtomicRefCell` with checks for
+/// whether or not the value can be borrowed as mutable, or as a reference.
+/// If it can't and assuming there is a check, the code returns and doesn't panic.
 type WidgetsMap = IndexMap<String, Arc<AtomicRefCell<WidgetType>>>;
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
@@ -416,6 +420,7 @@ impl CustomWindowsUtils {
             return;
         };
 
+        #[allow(clippy::arc_with_non_send_sync)]
         window_widgets.insert(identifier, Arc::new(AtomicRefCell::new(widget_type)));
     }
 
@@ -455,6 +460,7 @@ impl CustomWindowsUtils {
                 return;
             }
 
+            #[allow(clippy::arc_with_non_send_sync)]
             widgets.insert(identifier, Arc::new(AtomicRefCell::new(widget_type)));
             return;
         }

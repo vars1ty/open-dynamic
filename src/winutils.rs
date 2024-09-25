@@ -9,28 +9,14 @@ use ahash::AHashMap;
 use parking_lot::RwLock;
 use rune::Any;
 use std::{collections::HashMap, ffi::*, os::windows::prelude::OsStringExt, sync::Arc};
+use tinyapi32::tinyapi32::*;
 use windows::{
     core::PCSTR,
     System::VirtualKey,
-    Win32::{
-        Foundation::*,
-        System::{Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*},
-    },
+    Win32::{Foundation::{HANDLE, MAX_PATH}, System::{Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*}},
 };
 use wmem::Memory;
 use zstring::ZString;
-
-// Manually imported Win32 API functions.
-extern "system" {
-    pub fn AllocConsole() -> i32;
-    pub fn FreeConsole() -> i32;
-    pub fn GetAsyncKeyState(key: i32) -> i16;
-    pub fn ScreenToClient(hWnd: isize, lpPoint: *mut POINT) -> i32;
-    pub fn GetCursorPos(lpPoint: *mut POINT) -> i32;
-    pub fn GetForegroundWindow() -> isize;
-    pub fn MessageBoxA(hWnd: isize, lpText: *const u8, lpCaption: *const u8, uType: u32) -> i32;
-    pub fn GetCurrentProcess() -> isize;
-}
 
 /// Renderer enum for determing the render target for an unsupported game.
 #[derive(Debug, Default)]

@@ -2,7 +2,7 @@ use crate::{
     globals::DELTA_TIME,
     mod_cores::base_core::BaseCore,
     utils::{eguiutils::ImGuiUtils, extensions::OptionExt, scripting::script_modules::*},
-    winutils::{GetCurrentProcess, WinUtils},
+    winutils::WinUtils,
 };
 use dashmap::DashMap;
 use dll_syringe::{
@@ -16,6 +16,7 @@ use std::{
     os::windows::io::FromRawHandle,
     sync::{atomic::Ordering, Arc, OnceLock},
 };
+use tinyapi32::tinyapi32::GetCurrentProcess;
 
 /// A structure that contains a set of functions from dynamic.
 #[allow(dead_code)]

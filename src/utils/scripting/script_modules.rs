@@ -14,7 +14,7 @@ use crate::{
         stringutils::StringUtils,
         ui::customwindows::CustomWindowsUtils,
     },
-    winutils::{AddressType, GetCurrentProcess, WinUtils},
+    winutils::{AddressType, WinUtils},
 };
 use dashmap::DashMap;
 use indexmap::IndexMap;
@@ -27,6 +27,7 @@ use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},
 };
+use tinyapi32::tinyapi32::GetCurrentProcess;
 use windows::Win32::Foundation::HANDLE;
 use wmem::Memory;
 
