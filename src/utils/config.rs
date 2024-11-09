@@ -51,7 +51,7 @@ impl Default for Config {
         let cached_config_ref = cached_config.get_or_init(|| {
             serde_jsonc::from_str(&config_content).unwrap_or_else(|error| {
                 crash!(
-                    "[ERROR] Failed parsing config.json, error: ",
+                    "[ERROR] Failed parsing config.jsonc, error: ",
                     error,
                     "\n[INFO] This is entirely your own fault, and not dynamics. Learn JSON!"
                 )
@@ -64,11 +64,7 @@ impl Default for Config {
                 "[ERROR] Serials string-array in the config is missing!"
             ));
 
-        if cfg_serials.is_empty() {
-            crash!("[ERROR] At least one serial has to be present inside of your config!");
-        }
-
-        let serials = cfg_serials
+        let mut serials = cfg_serials
             .to_vec()
             .iter()
             .map(|serial| {
@@ -78,6 +74,11 @@ impl Default for Config {
                     .to_owned()
             })
             .collect::<Vec<_>>();
+
+        if cfg_serials.is_empty() {
+            log!("[WARN] No serials present, using free version!");
+            serials.push(std::mem::take(&mut zencstr!("FREE-ACCESS").data));
+        }
 
         let detect_deadlocks = cached_config_ref[&zencstr!("detect_deadlocks").data]
             .as_bool()
@@ -108,7 +109,6 @@ impl Config {
     }
 
     /// Should 0.0.0.0 be used over the public server ip?
-    /// This is required for the host machine, as it can't use the public ip to connect.
     pub fn get_use_local_server(&self) -> bool {
         self.get()[&zencstr!("use_local_server").data]
             .as_bool()
@@ -202,7 +202,10 @@ impl Config {
     pub fn get_renderer_target(&self) -> Renderer {
         let defined = self.get()[&zencstr!("renderer_target").data]
             .as_str()
-            .unwrap_or_default();
+            .unwrap_or({
+                log!("[WARN] No renderer_target defined, using None.");
+                "None"
+            });
 
         match defined {
             "DirectX9" => Renderer::DirectX9,

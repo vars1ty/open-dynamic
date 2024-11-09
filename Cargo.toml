@@ -2,7 +2,7 @@ cargo-features = ["trim-paths"]
 
 [package]
 name = "dynamic"
-version = "6.3.0-release"
+version = "6.4.0-release"
 edition = "2021"
 
 [lib]
@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 hudhook = { path = "/home/stackalloc/Git/hudhook", features = [ "dx9", "dx12", "dx11", "opengl3" ], default-features = false }
 windows = { version = "0.51.1", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "System", "Win32_System_LibraryLoader"] }
 retour = { git = "https://github.com/Hpmason/retour-rs.git", features = ["static-detour"] }
-flate2 = { version = "1.0.33", features = ["zlib"], default-features = false }
+flate2 = { version = "1.0.34", features = ["zlib"], default-features = false }
 parking_lot = { version = "0.12.2", features = ["deadlock_detection"] }
 tinyapi32 = { path = "/home/stackalloc/Git/tinyapi32" }
 zstring = { path = "/home/stackalloc/Git/zstring" }
@@ -25,9 +25,9 @@ dll-syringe = "0.15.2"
 magic-crypt = "3.1.13"
 atomic_float = "1.1.0"
 message-io = "0.18.1"
-indexmap = "2.5.0"
+indexmap = "2.6.0"
 dashmap = "6.1.0"
-obfstr = "0.4.3"
+obfstr = "0.4.4"
 ahash = "0.8.11"
 image = "0.24.9"
 rkyv = "0.7.45"

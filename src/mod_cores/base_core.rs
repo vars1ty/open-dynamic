@@ -46,7 +46,9 @@ impl BaseCore {
             config
                 .get_product_serials()
                 .first()
-                .unwrap_or_crash(zencstr!("[ERROR] Missing primary NDNX/INTERNAL serial!"))
+                .unwrap_or_crash(zencstr!(
+                    "[ERROR] Missing primary serial, this should never happen!"
+                ))
                 .to_owned(),
         ));
         RDetour::register_all_detours();
@@ -119,7 +121,6 @@ impl BaseCore {
             if elapsed == 5.0 && !is_connected {
                 log!("[NOTICE] This is taking longer than expected, ensure you have a stable connection!");
                 log!("[NOTICE] Also ensure that Windows Defender (or any other anti-virus) is not interfering.");
-                log!("[NOTICE] If you are on a VPN, only use Mullvad, PerfectPrivacy or IVPN. All others should remain off.");
             }
 
             // If it has been 10 seconds and we aren't connected, ask the user if they want to try
@@ -130,7 +131,7 @@ impl BaseCore {
 
                 let mut prompt = Prompter::new("[PROMPT] Write 'r' to try and re-connect. Write any other response to close dynamic.", vec!["R", "r"]);
                 if prompt.prompt().is_some() {
-                    log!("[PROMPT] Trying to connect again...");
+                    log!("[PROMPT] Reconnecting...");
                     drop(prompt);
 
                     break Self::connect_crosscom(username, channel, use_local_server, main_serial);
@@ -176,7 +177,7 @@ impl BaseCore {
 
                 drop(deadlocks);
                 crash!(
-                    "[ERROR] Deadlock detected, crash log to send in #assistance:\n",
+                    "[ERROR] Deadlock detected, crash log to forward:\n",
                     crash_log,
                     "\ndynamic will close as it isn't deemed safe to continue running."
                 );

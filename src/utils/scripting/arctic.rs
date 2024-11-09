@@ -107,7 +107,7 @@ pub struct DNXFunctions {
     config_get_serials: Box<dyn Fn() -> Arc<Vec<String>> + Send + Sync>,
 
     // ImGui functions, no explanation needed as they are self-explanatory and documented online.
-    // To be removed after IL has been remade.
+    // To be removed in the near future.
     imgui_text: extern "Rust" fn(&Ui, &str),
     imgui_button: extern "Rust" fn(&Ui, &str) -> bool,
     imgui_button_with_size: extern "Rust" fn(&Ui, &str, [f32; 2]) -> bool,

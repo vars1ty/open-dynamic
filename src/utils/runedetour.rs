@@ -228,6 +228,11 @@ impl RDetour {
         };
 
         let Some(rune_function) = rdetour.get_rune_function() else {
+            log!(
+                "[ERROR] Missing Rune function for RDetour ID ",
+                rdetour.get_detour_id(),
+                "!"
+            );
             return 0;
         };
 
@@ -388,7 +393,7 @@ impl RDetour {
     /// Returns `true` if this detour has been acquired, `false` if it hasn't.
     /// If it has, it is **not** available for `install_detour*`.
     const fn is_detour_acquired(&self) -> bool {
-        self.from_ptr.is_some() || self.detour.is_some()
+        self.get_from_address().is_some() || self.get_raw_detour().is_some()
     }
 }
 

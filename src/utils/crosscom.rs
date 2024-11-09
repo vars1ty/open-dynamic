@@ -175,7 +175,7 @@ impl CrossCom {
         let (handler, listener) = node::split();
 
         let mut server_address = if self.use_local_server {
-            log!("## DEVELOPMENT SERVER ACTIVE ##");
+            log!("## Development: Using local server at port 8391!");
             zencstr!("0.0.0.0:8391")
         } else {
             zencstr!(include_str!("../../crosscom_ip").replace(['\n', '\r'], ""))
@@ -187,7 +187,7 @@ impl CrossCom {
             std::mem::take(&mut server_address.data),
         ) {
             crash!(
-                "[ERROR] Couldn't connect to server, report the following message to #assistance: ",
+                "[ERROR] Couldn't connect to server, report the following message: ",
                 error
             );
         }
@@ -262,7 +262,7 @@ impl CrossCom {
             DataType::CheckIsSerialOKResponse(_success) => self.send_to_channel(server_data),
             DataType::ServerError(ref error) => crash!(error),
             _ => {
-                crash!("[SECURITY] Received an unknown data type, closing dynamic for your own safety. Report this to #assistance ASAP!");
+                crash!("[SECURITY] Received an unknown data type, closing dynamic for your own safety.");
             }
         }
     }
@@ -303,7 +303,7 @@ impl CrossCom {
     /// Sends the specified Rune script.
     pub fn send_script(&self, source: &str) {
         self.send_data_type(DataType::SendScripts(source.to_owned()), None);
-        log!("[PARTY] Sent script to party members!");
+        log!("[PARTY] Sent script to channel members!");
     }
 
     /// Sends the variables, if required to.
@@ -311,18 +311,12 @@ impl CrossCom {
         self.send_data_type(DataType::UpdateVariables(variables), None);
     }
 
-    /// Sends the specified data type (if any) and waits for a server message to be received, then
+    /// Sends the specified data type and waits for a server message to be received, then
     /// passes it into `callback`.
     /// `callback` should return true/false for whether or not the message was the correct one or
     /// not.
-    fn send_and_wait<F: Fn(DataType) -> bool>(
-        &self,
-        send_data_type: Option<DataType>,
-        callback: F,
-    ) {
-        if let Some(send_data_type) = send_data_type {
-            self.send_data_type(send_data_type, None);
-        }
+    fn send_and_wait<F: Fn(DataType) -> bool>(&self, send_data_type: DataType, callback: F) {
+        self.send_data_type(send_data_type, None);
 
         loop {
             let Some(server_message) = self.get_network_listener().wait_for_message_raw() else {
@@ -339,16 +333,13 @@ impl CrossCom {
     #[optimize(size)]
     pub fn get_variables(&self) -> HashMap<String, String> {
         let mut result = OnceCell::new();
-        self.send_and_wait(
-            Some(DataType::RequestVariables),
-            |data_type| match data_type {
-                DataType::ReceiveVariables(variables) => {
-                    result.get_or_init(|| variables);
-                    true
-                }
-                _ => false,
-            },
-        );
+        self.send_and_wait(DataType::RequestVariables, |data_type| match data_type {
+            DataType::ReceiveVariables(variables) => {
+                result.get_or_init(|| variables);
+                true
+            }
+            _ => false,
+        });
 
         std::mem::take(
             result
@@ -362,7 +353,7 @@ impl CrossCom {
     pub fn get_community_content(&self) -> Vec<CommunityItem> {
         let mut result = OnceCell::new();
         self.send_and_wait(
-            Some(DataType::BroadcastCommunityContent(None)),
+            DataType::BroadcastCommunityContent(None),
             |data_type| match data_type {
                 DataType::BroadcastCommunityContent(content) => {
                     result.get_or_init(|| {
@@ -387,7 +378,7 @@ impl CrossCom {
     #[optimize(size)]
     pub fn get_fonts(&self) -> (Vec<u8>, Vec<u8>) {
         let mut result = OnceCell::new();
-        self.send_and_wait(Some(DataType::RequestFonts), |data_type| match data_type {
+        self.send_and_wait(DataType::RequestFonts, |data_type| match data_type {
             DataType::SendFonts(normal, bold) => {
                 result.get_or_init(|| (normal, bold));
                 true

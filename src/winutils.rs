@@ -13,7 +13,10 @@ use tinyapi32::tinyapi32::*;
 use windows::{
     core::PCSTR,
     System::VirtualKey,
-    Win32::{Foundation::{HANDLE, MAX_PATH}, System::{Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*}},
+    Win32::{
+        Foundation::{HANDLE, MAX_PATH},
+        System::{Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*},
+    },
 };
 use wmem::Memory;
 use zstring::ZString;
@@ -160,7 +163,11 @@ impl WinUtils {
             .iter()
             .find(|(module_name, _)| module_name.contains(name))
             .map(|(_, value)| value.0)
-            .unwrap_or_crash(zencstr!("[ERROR] Couldn't find any module named ", name))
+            .unwrap_or_crash(zencstr!(
+                "[ERROR] Couldn't find any module named \"",
+                name,
+                "\"!"
+            ))
     }
 
     /// Gets the base address of a module.
@@ -179,11 +186,14 @@ impl WinUtils {
             .unwrap_or_else(|_| crash!("[ERROR] Couldn't get process modules!"));
         let mut hashmap = AHashMap::new();
 
-        // Insert the modules as Name, MODULEENTRY32.
+        // Insert the modules as Name, SafeMODULEENTRY32.
         for module in modules {
             let module_name = String::from_utf8(Memory::convert_module_name(module.szModule))
-                .unwrap_or_else(|_| {
-                    crash!("[ERROR] Couldn't get the module name as a valid UTF-8 String!")
+                .unwrap_or_else(|error| {
+                    crash!(
+                        "[ERROR] Couldn't get the module name as a valid UTF-8 String, error: ",
+                        error
+                    )
                 });
             hashmap.insert(module_name, SafeMODULEENTRY32(module));
         }

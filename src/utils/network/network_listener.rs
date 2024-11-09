@@ -23,8 +23,6 @@ impl NetworkListener {
             OnceLock<(Sender<CrossComServerData>, Receiver<CrossComServerData>)>,
         >,
     ) -> Option<CrossComServerData> {
-        // Pause the calling thread until an output has been received.
-        // When one has been received, return.
         crossbeam_channel
             .get()
             .map(|(_, receiver)| receiver.recv())
