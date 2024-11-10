@@ -84,7 +84,6 @@ impl ImGuiUtils {
 
         // Load custom fonts if any are defined.
         let Some(custom_fonts) = config.get_fonts().take() else {
-            log!("[FONTS] No custom fonts have been defined, skipping.");
             return;
         };
 
@@ -187,7 +186,7 @@ impl ImGuiUtils {
         style.colors = colors;
     }
 
-    /// Draws a software virtual cursor.
+    /// Draws a virtual software cursor.
     pub fn render_software_cursor(ui: &imgui::Ui, point: &mut POINT) {
         if !ui.io().want_capture_mouse {
             return;

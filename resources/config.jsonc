@@ -1,0 +1,37 @@
+{
+    // The renderer target for unsupported games.
+    // This can take one of these values:
+    // DirectX9, DirectX11, DirectX12, and OpenGL.
+    // Default Value: OpenGL
+    "renderer_target": "OpenGL",
+
+    // Should dynamic try and look for deadlocks every 2s?
+    // Crashing with a log if one is detected.
+    // Default Value: true
+    "detect_deadlocks": true,
+
+    /// Header Font Size, by default its 26.
+    "header_font_size": 26,
+
+    /// Main Font Size, by default its 18.
+    "main_font_size": 18,
+
+    // Free ("hide") the console when injected?
+    // Not recommended since it'll hide certain error messages.
+    // Default Value: false
+    "free_console": false,
+
+    // Serials for products, one string per entry.
+    // The first serial HAS to be your dynamic serial, starting
+    // with DNX-[...]/NDNX-[...]/PDNX-[...], otherwise dynamic won't verify you.
+    // ## CRITICAL: Do NOT EVER share any of the values inside of this array.
+    // ## They are reserved for you and only you.
+    // Default Value: Empty
+    "serials": [],
+
+    // Custom fonts that dynamic should load.
+    // Each item in the fonts object should be like: "relative_font_path.extension": font_size_f32
+    // For example: "Comfortaa.ttf": 12.0
+    // Default Value: Empty
+    "fonts": {}
+}

@@ -11,8 +11,6 @@ use std::{
     sync::Arc,
 };
 
-use super::stringutils::StringUtils;
-
 /// Simple JSON config.
 pub struct Config {
     /// Cached config.
@@ -39,11 +37,13 @@ impl Default for Config {
             .replace(&zencstr!("dynamic.dll").data, "");
         let path = zencstr!(&dir_path, "config.jsonc");
         let config_content = read_to_string(&path.data).unwrap_or_else(|error| {
-            crash!(
+            log!(
                 "[ERROR] Couldn't read config.jsonc, error: ",
                 error,
-                "\n[INFO] This is entirely your own fault, and not dynamics. Learn JSON!"
-            )
+                "\n[INFO] This is entirely your own fault, and not dynamics. Learn JSON!",
+                "\n[INFO] Using default OpenGL config."
+            );
+            include_str!("../../resources/config.jsonc").to_owned()
         });
         drop(path);
 
@@ -58,11 +58,23 @@ impl Default for Config {
             })
         });
 
+        let default_cfg_serials =
+            vec![
+                serde_jsonc::to_value(std::mem::take(&mut zencstr!("FREE-ACCESS").data))
+                    .unwrap_or_else(|error| {
+                        crash!(
+                            "[ERROR] Failed creating default_cfg_serials, error: ",
+                            error
+                        )
+                    }),
+            ];
+
         let cfg_serials = cached_config_ref[&zencstr!("serials").data]
             .as_array()
-            .unwrap_or_crash(zencstr!(
-                "[ERROR] Serials string-array in the config is missing!"
-            ));
+            .unwrap_or_else(|| {
+                log!("[WARN] Missing serials string-array, using an empty array!");
+                &default_cfg_serials
+            });
 
         let mut serials = cfg_serials
             .to_vec()
@@ -75,7 +87,7 @@ impl Default for Config {
             })
             .collect::<Vec<_>>();
 
-        if cfg_serials.is_empty() {
+        if serials.is_empty() {
             log!("[WARN] No serials present, using free version!");
             serials.push(std::mem::take(&mut zencstr!("FREE-ACCESS").data));
         }
@@ -130,8 +142,7 @@ impl Config {
         path.push_str(self.path);
 
         if path.contains('/') {
-            unsafe { StringUtils::replace_zero_alloc::<1>(&mut path, *b"/", *b"\\") };
-            path.push_str(name);
+            path.push_str(&name.replace('/', "\\"));
         } else {
             path.push_str(name);
         }
@@ -145,10 +156,8 @@ impl Config {
             return false;
         };
 
-        // Create file.
         let file = std::fs::File::create(path);
         if let Ok(mut file) = file {
-            // Write to file.
             let write = file.write_all(content.as_bytes());
             if let Err(error) = write {
                 log!("[ERROR] Failed writing to file, error: ", error);
@@ -213,7 +222,7 @@ impl Config {
             "DirectX12" => Renderer::DirectX12,
             "OpenGL" => Renderer::OpenGL,
             "None" => Renderer::None,
-            _=> crash!("[ERROR] Undefined renderer target. Available options are: DirectX9, DirectX11, DirectX12, OpenGL and None.")
+            _=> crash!("[ERROR] Unknown renderer target. Available options are: DirectX9, DirectX11, DirectX12, OpenGL and None.")
         }
     }
 

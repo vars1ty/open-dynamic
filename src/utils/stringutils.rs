@@ -51,32 +51,13 @@ impl StringUtils {
         Some(bytes)
     }
 
-    /// Takes `string` and replaces `lookup` with `replacement`.
-    /// # Safety
-    /// `lookup` **has** to be the same length as `replacement`, as the function works on the raw
-    /// underlying bytes and cannot differ in size.
-    /// This is enforced at compile-time.
-    pub unsafe fn replace_zero_alloc<const N: usize>(
-        string: &mut str,
-        lookup: [u8; N],
-        replacement: [u8; N],
-    ) {
-        let bytes = unsafe { string.as_bytes_mut() };
-        for i in 0..(bytes.len() - N + 1) {
-            let slice = &mut bytes[i..i + N];
-            if slice == lookup {
-                slice.copy_from_slice(&replacement);
-            }
-        }
-    }
-
     /// Helper for `crash!()` with multiple parameters.
     /// Takes the mutable ZString message and appends `encrypted_arg` at the back of it, reducing
     /// the need for 3 lines of extra code for each additional parameter, down to 1.
     #[inline(never)]
-    pub fn crash_helper_append(message: &mut ZString, encrypted_arg: impl Display) {
-        let arg_content = ZString::new(encrypted_arg.to_string());
-        print!("{arg_content}");
-        message.push_zstring(arg_content);
+    pub fn crash_helper_append(message: &mut ZString, encrypted_param: impl Display) {
+        let param_content = ZString::new(encrypted_param.to_string());
+        print!("{param_content}");
+        message.push_zstring(param_content);
     }
 }

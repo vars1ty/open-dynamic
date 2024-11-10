@@ -11,6 +11,7 @@ static_detour! {
 }
 
 /// Generic hooks which are enabled for all games.
+#[deprecated = "This shouldn't be enabled by default and should be moved to a Rune script."]
 pub struct GenericHoooks {
     /// If true, hinders all `SetCursorPos` calls from being accepted.
     pub disable_set_cursor_pos: Arc<AtomicBool>,
