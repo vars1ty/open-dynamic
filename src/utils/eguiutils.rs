@@ -395,4 +395,22 @@ impl ImGuiUtils {
         ui.set_column_width(ui.current_column_index(), width);
         ui.next_column();
     }
+
+    /// Syncs the Windows clipboard back to ImGui.
+    /// This is a hack and only needed due to Hudhook being broken with the clipboard.
+    /// For Linux, this won't work with content that has been copied from outside a Wine
+    /// application.
+    /// **Note**: This should be called every frame and will **only** sync the clipboard if CTRL+V
+    /// has been pressed.
+    pub fn sync_clipboard(ui: &imgui::Ui) {
+        if !ui.io().keys_down[imgui::Key::V as usize] || !ui.io().key_ctrl {
+            return;
+        }
+
+        let Ok(text) = clipboard_win::get_clipboard_string() else {
+            return;
+        };
+
+        ui.set_clipboard_text(text);
+    }
 }
