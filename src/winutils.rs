@@ -142,8 +142,8 @@ impl WinUtils {
             ZString::new(
                 OsString::from_wide(&buffer[..size as _])
                     .into_string()
-                    .unwrap_or_else(|_| {
-                        crash!("[ERROR] Failed to safely convert DLL path to a valid OsString!")
+                    .unwrap_or_else(|error| {
+                        crash!("[ERROR] Failed to safely convert DLL path to a valid OsString, error: ", format!("{error:?}"))
                     }),
             )
         }
@@ -183,7 +183,7 @@ impl WinUtils {
         }
 
         let modules = Memory::get_modules()
-            .unwrap_or_else(|_| crash!("[ERROR] Couldn't get process modules!"));
+            .unwrap_or_else(|error| crash!("[ERROR] Couldn't get process modules, error: ", error));
         let mut hashmap = AHashMap::new();
 
         // Insert the modules as Name, SafeMODULEENTRY32.
@@ -267,16 +267,16 @@ impl WinUtils {
     }
 
     /// Parses a hexadecimal value to its normal primitive value.
-    pub fn hex_to_primitive(hex: &str) -> RuneDoubleResultPrimitive {
-        let value_i64 = i64::from_str_radix(&hex[2..], 16).unwrap_or_default();
-        let value_i32 = i32::from_str_radix(&hex[2..], 16).unwrap_or_default();
-        RuneDoubleResultPrimitive::new(
-            value_i32 as i8,
-            value_i32,
-            value_i64,
-            value_i32 as f32,
-            value_i64 as f64,
-        )
+    pub fn hex_to_primitive(hex: &str) -> i64 {
+        i64::from_str_radix(&hex[2..], 16).unwrap_or_else(|error| {
+            log!(
+                "[ERROR] Hex \"",
+                hex,
+                "\" couldn't be turned into an i64, falling back to 0. Error: ",
+                error
+            );
+            0
+        })
     }
 
     /// Gets the address to a function inside of a module.
@@ -307,7 +307,11 @@ impl WinUtils {
         crosscom: Arc<RwLock<CrossCom>>,
     ) -> *const i64 {
         if base_address == 0 {
-            crash!("[ERROR] Passed base address was null!");
+            crash!(
+                "[ERROR] Passed base address was null for \"",
+                variable_name,
+                "\"!"
+            );
         }
 
         // A reader is required, because if we just use read() in the if-statement, then it won't
@@ -320,7 +324,12 @@ impl WinUtils {
         // a writer and inserts the value before returning it.
         let offset: usize = if let Some(value) = variables_reader.get(variable_name) {
             value.parse().unwrap_or_else(|error| {
-                crash!("[ERROR] Failed parsing offset as usize, error: ", error)
+                crash!(
+                    "[ERROR] Failed parsing offset for \"",
+                    variable_name,
+                    "\" as usize, error: ",
+                    error
+                )
             })
         } else {
             // Drop reader, we don't need it anymore.
@@ -386,39 +395,6 @@ impl WinUtils {
     pub fn sleep_and_exit(secs: u64) -> ! {
         std::thread::sleep(std::time::Duration::from_secs(secs));
         std::process::exit(-1)
-    }
-
-    /// Gets the username of the active user through `whoami`.
-    pub fn get_username() -> ZString {
-        ZString::new(
-            String::from_utf8(
-                std::process::Command::new(&zencstr!("whoami").data)
-                    .output()
-                    .unwrap_or_else(|error| {
-                        crash!(
-                            "[ERROR] Failed getting `whoami` output, error: ",
-                            error,
-                            ". Restart your PC and try again."
-                        )
-                    })
-                    .stdout,
-            )
-            .unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed parsing stdout from `whomai` as an UTF-8 String, error: ",
-                    error,
-                    ". Restart your PC and try again."
-                )
-            })
-            .chars()
-            .rev()
-            .take_while(|char| *char != '\\')
-            .collect::<String>()
-            .chars()
-            .rev()
-            .collect::<String>()
-            .replace(['\n', '\r'], ""),
-        )
     }
 
     /// Displays a message box.

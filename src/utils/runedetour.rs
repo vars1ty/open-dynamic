@@ -228,11 +228,6 @@ impl RDetour {
         };
 
         let Some(rune_function) = rdetour.get_rune_function() else {
-            log!(
-                "[ERROR] Missing Rune function for RDetour ID ",
-                rdetour.get_detour_id(),
-                "!"
-            );
             return 0;
         };
 

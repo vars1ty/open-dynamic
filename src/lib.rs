@@ -31,13 +31,8 @@ use hudhook::{
     Hudhook,
 };
 use parking_lot::RwLock;
-use std::{
-    ffi::c_void,
-    io::IsTerminal,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::{ffi::c_void, io::IsTerminal, sync::Arc};
 use tinyapi32::tinyapi32::{AllocConsole, FreeConsole};
-use utils::hooks::GenericHoooks;
 use zstring::ZString;
 
 /// Called when the DLL has been injected/detached.
@@ -95,7 +90,7 @@ fn hook(hmodule: isize) {
             std::thread::spawn(move || {
                 // No freeing the console, we are free to listen for additional commands.
                 let mut prompt = Prompter::new_any_response(
-                    "Commands:\n» free_console\n» execute_script [relative_path]\n» exit",
+                    "Commands:\n» free_console\n» execute_script [relative_path (String)]\n» exit",
                 );
                 loop {
                     // Can't be None here due to new_any_response, so it's safe to use unchecked.
@@ -132,32 +127,16 @@ fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
     // Determine the renderer target from the config.
     match renderer_target {
         Renderer::DirectX9 => {
-            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
-            builder = builder.with::<ImguiDx9Hooks>(DX11UI::new(
-                Arc::clone(&base_core),
-                disable_set_cursor_pos_clone,
-            ));
+            builder = builder.with::<ImguiDx9Hooks>(DX11UI::new(Arc::clone(&base_core)));
         }
         Renderer::DirectX11 => {
-            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
-            builder = builder.with::<ImguiDx11Hooks>(DX11UI::new(
-                Arc::clone(&base_core),
-                disable_set_cursor_pos_clone,
-            ));
+            builder = builder.with::<ImguiDx11Hooks>(DX11UI::new(Arc::clone(&base_core)));
         }
         Renderer::DirectX12 => {
-            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
-            builder = builder.with::<ImguiDx12Hooks>(DX11UI::new(
-                Arc::clone(&base_core),
-                disable_set_cursor_pos_clone,
-            ));
+            builder = builder.with::<ImguiDx12Hooks>(DX11UI::new(Arc::clone(&base_core)));
         }
         Renderer::OpenGL => {
-            let (_, disable_set_cursor_pos_clone) = setup_generic_hooks();
-            builder = builder.with::<ImguiOpenGl3Hooks>(DX11UI::new(
-                Arc::clone(&base_core),
-                disable_set_cursor_pos_clone,
-            ));
+            builder = builder.with::<ImguiOpenGl3Hooks>(DX11UI::new(Arc::clone(&base_core)));
         }
         Renderer::None => {
             log!("Renderer hooks DISABLED, you are now entirely on your own!");
@@ -199,14 +178,6 @@ fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
             false,
         );
     });
-}
-
-/// Installs generic hooks and returns the instance, including the `disable_set_cursor_pos`
-/// `Arc<AtomicBool>`.
-fn setup_generic_hooks() -> (GenericHoooks, Arc<AtomicBool>) {
-    let generic_hooks = GenericHoooks::init();
-    let disable_set_cursor_pos_clone = Arc::clone(&generic_hooks.disable_set_cursor_pos);
-    (generic_hooks, disable_set_cursor_pos_clone)
 }
 
 /// Called when a console command should be looked up and executed, after everything's initialized.

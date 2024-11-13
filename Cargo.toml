@@ -20,6 +20,7 @@ wmem = { path = "/home/stackalloc/Git/wmem" }
 sbyt = { path = "/home/stackalloc/Git/sbyt" }
 crossbeam-channel = "0.5.13"
 atomic_refcell = "0.1.13"
+clipboard-win = "5.4.0"
 serde_jsonc = "1.0.108"
 dll-syringe = "0.15.2"
 magic-crypt = "3.1.13"

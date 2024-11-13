@@ -826,6 +826,12 @@ impl UIModules {
             })
             .build()?;
 
+        module
+            .function("is_cursor_in_ui", || {
+                IS_CURSOR_IN_UI.load(Ordering::Relaxed)
+            })
+            .build()?;
+
         Ok(module)
     }
 }

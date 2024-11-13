@@ -7,7 +7,6 @@ pub mod cryptutils;
 pub mod dynwidget;
 pub mod eguiutils;
 pub mod extensions;
-pub mod hooks;
 pub mod network;
 pub mod prompter;
 pub mod scripting;

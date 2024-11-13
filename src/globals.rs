@@ -1,7 +1,7 @@
 use ahash::AHashMap;
 use atomic_float::AtomicF32;
 use parking_lot::Mutex;
-use std::sync::OnceLock;
+use std::sync::{atomic::AtomicBool, OnceLock};
 use windows::Win32::System::Diagnostics::ToolHelp::MODULEENTRY32;
 use zstring::ZString;
 
@@ -17,3 +17,7 @@ pub static LOGGED_MESSAGES: OnceLock<Mutex<ZString>> = OnceLock::new();
 
 /// Last-set delta time.
 pub static DELTA_TIME: AtomicF32 = AtomicF32::new(0.0);
+
+/// Is the cursor inside of an UI window?
+/// Global because tracking this across Rune will turn into a mess.
+pub static IS_CURSOR_IN_UI: AtomicBool = AtomicBool::new(true);

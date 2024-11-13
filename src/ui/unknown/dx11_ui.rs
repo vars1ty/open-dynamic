@@ -1,5 +1,5 @@
 use crate::{
-    globals::DELTA_TIME,
+    globals::{DELTA_TIME, IS_CURSOR_IN_UI},
     mod_cores::base_core::BaseCore,
     ui::community::CommunityWindow,
     utils::{eguiutils::ImGuiUtils, extensions::OptionExt},
@@ -10,10 +10,7 @@ use hudhook::{
     ImguiRenderLoop, RenderContext,
 };
 use parking_lot::RwLock;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, OnceLock,
-};
+use std::sync::{atomic::Ordering, Arc, OnceLock};
 use tinyapi32::tinyapi32::POINT;
 
 /// Simple basic ImGui windows, responsible for also drawing custom windows.
@@ -33,9 +30,6 @@ pub struct DX11UI {
     /// Current cursor point.
     point: POINT,
 
-    /// Disable SetCursorPos calls?
-    disable_set_cursor_pos: Arc<AtomicBool>,
-
     /// Should the UI be displayed?
     display_ui: bool,
 
@@ -51,7 +45,7 @@ pub struct DX11UI {
 
 impl DX11UI {
     /// Returns an instance to `Self`.
-    pub fn new(base_core: Arc<RwLock<BaseCore>>, disable_set_cursor_pos: Arc<AtomicBool>) -> Self {
+    pub fn new(base_core: Arc<RwLock<BaseCore>>) -> Self {
         let reader = base_core
             .try_read()
             .unwrap_or_crash(zencstr!("[ERROR] Failed reading BaseCore"));
@@ -77,7 +71,6 @@ impl DX11UI {
             script_name: String::with_capacity(24),
             community_window: OnceLock::new(),
             point: POINT::default(),
-            disable_set_cursor_pos,
             display_ui: true,
             can_toggle_ui: true,
             crosscom_channel,
@@ -138,8 +131,7 @@ impl DX11UI {
 
             self.display_ui = !self.display_ui;
             if !self.display_ui {
-                // Allow cursor input.
-                self.disable_set_cursor_pos.store(false, Ordering::SeqCst);
+                IS_CURSOR_IN_UI.store(false, Ordering::Relaxed);
             }
 
             self.can_toggle_ui = false;
@@ -284,8 +276,7 @@ impl ImguiRenderLoop for DX11UI {
             return;
         }
 
-        self.disable_set_cursor_pos
-            .store(ui.io().want_capture_mouse, Ordering::SeqCst);
+        IS_CURSOR_IN_UI.store(ui.io().want_capture_mouse, Ordering::Relaxed);
         base_core_reader
             .get_custom_window_utils()
             .draw_custom_windows(ui, Arc::clone(&self.base_core));
