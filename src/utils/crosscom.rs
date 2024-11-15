@@ -421,12 +421,12 @@ impl CrossCom {
 
     /// Sends a message to the CrossCom channel.
     pub fn send_to_channel(&self, data: CrossComServerData) {
-        let (sender, _) = self
+        let Err(error) = self
             .get_network_listener()
             .get_crossbeam_channel()
-            .get()
-            .unwrap_or_crash(zencstr!("[ERROR] Crossbeam S/R hasn't been created!"));
-        let Err(error) = sender.send(data) else {
+            .0
+            .send(data)
+        else {
             return;
         };
 
