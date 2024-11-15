@@ -403,6 +403,21 @@ impl SystemModules {
             return;
         }
 
+        let current_process_handle = HANDLE(unsafe { GetCurrentProcess() } as isize);
+
+        // Read one byte from the address just to see if it errors and potentially hinder crashes.
+        if let Err(error) =
+            Memory::read::<u8>(&current_process_handle, address as *const i64, Some(1))
+        {
+            log!(
+                "[ERROR] Memory at address ",
+                format!("{:?}", address as *const i64),
+                " is not valid, error: ",
+                error
+            );
+            return;
+        }
+
         let on_error = |error: windows::core::Error| {
             log!(
                 "[ERROR] Failed writing to memory address at ",
@@ -414,7 +429,7 @@ impl SystemModules {
 
         if let Ok(data_i64) = data.as_integer().into_result() {
             if let Err(error) = Memory::write(
-                &HANDLE(unsafe { GetCurrentProcess() } as isize),
+                &current_process_handle,
                 address as _,
                 &(data_i64 as i32),
                 None,
@@ -426,12 +441,9 @@ impl SystemModules {
         }
 
         if let Ok(data_usize) = data.as_usize().into_result() {
-            if let Err(error) = Memory::write(
-                &HANDLE(unsafe { GetCurrentProcess() } as isize),
-                address as _,
-                &data_usize,
-                None,
-            ) {
+            if let Err(error) =
+                Memory::write(&current_process_handle, address as _, &data_usize, None)
+            {
                 on_error(error);
             }
 
@@ -440,7 +452,7 @@ impl SystemModules {
 
         if let Ok(data_f64) = data.as_float().into_result() {
             if let Err(error) = Memory::write(
-                &HANDLE(unsafe { GetCurrentProcess() } as isize),
+                &current_process_handle,
                 address as _,
                 &(data_f64 as f32),
                 None,
@@ -479,7 +491,7 @@ impl SystemModules {
         });
 
         if let Err(error) = Memory::write(
-            &HANDLE(unsafe { GetCurrentProcess() } as isize),
+            &current_process_handle,
             address as _,
             &bytes,
             Some(bytes.len()),
@@ -530,11 +542,11 @@ impl SystemModules {
     {
         data.parse().unwrap_or_else(|error| {
             log!(
-                "[ERROR] Failed parsing ",
+                "[ERROR] Failed parsing \"",
                 data,
-                ", returning ",
+                "\", returning ",
                 std::any::type_name::<T>(),
-                "::Default(). Error: ",
+                "::default(). Error: ",
                 error
             );
             T::default()
@@ -562,7 +574,7 @@ impl SystemModules {
     /// Gets the value of a Thread key.
     pub fn get_thread_key(key: String, thread_keys: Arc<DashMap<String, bool>>) -> bool {
         *thread_keys.get(&key).unwrap_or_crash(zencstr!(
-            "[ERROR] Thread Key ",
+            "[ERROR] Thread key ",
             key,
             " has not been defined!"
         ))

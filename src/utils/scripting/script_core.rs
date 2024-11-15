@@ -99,7 +99,7 @@ impl ScriptCore {
         for module in &*self
             .cross_modules
             .try_lock()
-            .unwrap_or_crash(zencstr!("[ERROR] Cross Modules is locked!"))
+            .ok_or("Cross Modules is locked!")?
         {
             context.install(module)?;
         }
