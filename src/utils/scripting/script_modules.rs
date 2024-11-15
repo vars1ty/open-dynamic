@@ -221,7 +221,7 @@ impl SystemModules {
                     .unwrap_or_crash(zencstr!(
                         "[ERROR] Unitialized Arctic instance inside of Script Engine!"
                     ))
-                    .arctic_inject_gateway(dll_name)
+                    .inject_plugin(dll_name)
             })
             .build()?;
 
