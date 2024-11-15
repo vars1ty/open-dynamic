@@ -257,13 +257,7 @@ impl ImGuiUtils {
             return;
         }
 
-        let Some(logged_messages) = LOGGED_MESSAGES
-            .get()
-            .unwrap_or_crash(zencstr!(
-                "[ERROR] Initialization of LOGGED_MESSAGES was somehow skipped!"
-            ))
-            .try_lock()
-        else {
+        let Some(logged_messages) = LOGGED_MESSAGES.try_lock() else {
             return;
         };
 

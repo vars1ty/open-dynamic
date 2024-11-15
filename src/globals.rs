@@ -1,19 +1,22 @@
 use ahash::AHashMap;
 use atomic_float::AtomicF32;
 use parking_lot::Mutex;
-use std::sync::{atomic::AtomicBool, OnceLock};
+use std::sync::{atomic::AtomicBool, LazyLock};
 use windows::Win32::System::Diagnostics::ToolHelp::MODULEENTRY32;
 use zstring::ZString;
+
+use crate::winutils::WinUtils;
 
 /// Safe wrapper around MODULEENTRY32.
 pub struct SafeMODULEENTRY32(pub MODULEENTRY32);
 thread_safe_structs!(SafeMODULEENTRY32);
 
 /// Cached process modules.
-pub static MODULES: OnceLock<AHashMap<String, SafeMODULEENTRY32>> = OnceLock::new();
+pub static MODULES: LazyLock<AHashMap<String, SafeMODULEENTRY32>> =
+    LazyLock::new(WinUtils::get_modules_no_cache);
 
 /// Logged screen (and stdout) messages.
-pub static LOGGED_MESSAGES: OnceLock<Mutex<ZString>> = OnceLock::new();
+pub static LOGGED_MESSAGES: LazyLock<Mutex<ZString>> = LazyLock::new(Default::default);
 
 /// Last-set delta time.
 pub static DELTA_TIME: AtomicF32 = AtomicF32::new(0.0);

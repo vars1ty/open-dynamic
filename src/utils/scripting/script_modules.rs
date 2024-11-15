@@ -241,18 +241,15 @@ impl SystemModules {
 
         std_module
             .function("get_lines_from_string", |input: String| {
-                let lines = input
+                input
                     .lines()
                     .map(|line| line.to_owned())
-                    .collect::<Vec<_>>();
-                lines
+                    .collect::<Vec<_>>()
             })
             .build()?;
 
         std_module
-            .function("read_file", |path: String| {
-                std::fs::read_to_string(path).unwrap_or_default()
-            })
+            .function("read_file", std::fs::read_to_string::<String>)
             .build()?;
 
         std_module

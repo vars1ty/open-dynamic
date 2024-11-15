@@ -187,13 +187,9 @@ impl WinUtils {
         Self::get_module(name).modBaseAddr
     }
 
-    /// Caches all the process modules if needed, otherwise returns the internal `AHashMap` with
-    /// the module name and the entry.
-    pub fn get_modules() -> &'static AHashMap<String, SafeMODULEENTRY32> {
-        if let Some(modules) = MODULES.get() {
-            return modules;
-        }
-
+    /// Fetches the modules from the current process and returns them.
+    /// This is the non-cache variant of `WinUtils::get_modules`.
+    pub fn get_modules_no_cache() -> AHashMap<String, SafeMODULEENTRY32> {
         let modules = Memory::get_modules()
             .unwrap_or_else(|error| crash!("[ERROR] Couldn't get process modules, error: ", error));
         let mut hashmap = AHashMap::new();
@@ -210,7 +206,13 @@ impl WinUtils {
             hashmap.insert(module_name, SafeMODULEENTRY32(module));
         }
 
-        MODULES.get_or_init(|| hashmap)
+        hashmap
+    }
+
+    /// Caches all the process modules if needed, otherwise returns the internal `AHashMap` with
+    /// the module name and the entry.
+    pub fn get_modules() -> &'static AHashMap<String, SafeMODULEENTRY32> {
+        &MODULES
     }
 
     /// Converts a byte-slice to its hexadecimal String-form.
@@ -435,13 +437,12 @@ impl WinUtils {
         };
     }
 
-    /// Logs a message to `LOGGED_MESSAGES` and `stdout`.
+    /// To be moved to general utils: Logs a message to `LOGGED_MESSAGES` and `stdout`.
     /// # Safety
     /// This should be relatively safe due to the usage of `OnceLock` and `Mutex<ZString>`.
     #[optimize(size)]
     pub fn log_message(mut message: ZString, new_line: bool) {
-        let Some(mut logged_messages) = LOGGED_MESSAGES.get_or_init(Default::default).try_lock()
-        else {
+        let Some(mut logged_messages) = LOGGED_MESSAGES.try_lock() else {
             return;
         };
 
