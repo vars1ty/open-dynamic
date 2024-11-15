@@ -16,20 +16,20 @@ use std::{
     os::windows::io::FromRawHandle,
     sync::{atomic::Ordering, Arc, OnceLock},
 };
-use tinyapi32::tinyapi32::GetCurrentProcess;
+use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
 /// A structure that contains a set of functions from dynamic.
 #[allow(dead_code)]
 #[allow(clippy::type_complexity)]
 pub struct DNXFunctions {
     /// `dynamic::log(message)` function. Logs both to the side-messages, and to `stdout`.
-    dynamic_log: extern "Rust" fn(&str),
+    dynamic_log: fn(&str),
 
     /// `Memory::read_string(address) function. Attempts to read a string at `address`.
-    memory_read_string: extern "Rust" fn(i64) -> &'static str,
+    memory_read_string: fn(i64) -> &'static str,
 
     /// `dynamic::get_delta_time()` function. Gets the current delta-time of the process.
-    dynamic_get_delta_time: extern "Rust" fn() -> f32,
+    dynamic_get_delta_time: fn() -> f32,
 
     /// Special function for making dynamic eject the DLL, rather than the other way around.
     /// This is needed because otherwise the process crashes.
@@ -78,7 +78,7 @@ pub struct DNXFunctions {
     server_get_variable: Box<dyn Fn(&str) -> Option<String> + Send + Sync>,
 
     /// Displays an error message and closes dynamic alongside with the parent process.
-    crash: extern "Rust" fn(&str) -> !,
+    crash: fn(&str) -> !,
 
     /// Installs a module into dynamic's Rune implementation.
     install_rune_module: Box<dyn Fn(Module) + Send + Sync>,
@@ -108,49 +108,49 @@ pub struct DNXFunctions {
 
     // ImGui functions, no explanation needed as they are self-explanatory and documented online.
     // To be removed in the near future.
-    imgui_text: extern "Rust" fn(&Ui, &str),
-    imgui_button: extern "Rust" fn(&Ui, &str) -> bool,
-    imgui_button_with_size: extern "Rust" fn(&Ui, &str, [f32; 2]) -> bool,
-    imgui_slider_i32: extern "Rust" fn(&Ui, &str, i32, i32, &mut i32) -> bool,
-    imgui_slider_u32: extern "Rust" fn(&Ui, &str, u32, u32, &mut u32) -> bool,
-    imgui_slider_f32: extern "Rust" fn(&Ui, &str, f32, f32, &mut f32) -> bool,
-    imgui_cursor_pos: extern "Rust" fn(&Ui) -> [f32; 2],
-    imgui_cursor_screen_pos: extern "Rust" fn(&Ui) -> [f32; 2],
-    imgui_set_cursor_pos: extern "Rust" fn(&Ui, [f32; 2]),
-    imgui_set_cursor_screen_pos: extern "Rust" fn(&Ui, [f32; 2]),
-    imgui_checkbox: extern "Rust" fn(&Ui, &str, &mut bool) -> bool,
-    imgui_item_rect_size: extern "Rust" fn(&Ui) -> [f32; 2],
-    imgui_item_rect_min: extern "Rust" fn(&Ui) -> [f32; 2],
-    imgui_item_rect_max: extern "Rust" fn(&Ui) -> [f32; 2],
-    imgui_calc_text_size: extern "Rust" fn(&Ui, &str) -> [f32; 2],
-    imgui_group: extern "Rust" fn(&Ui, Box<dyn FnOnce()>),
-    imgui_input_text_multiline: extern "Rust" fn(&Ui, &str, &mut String, [f32; 2]) -> bool,
-    imgui_input_text: extern "Rust" fn(&Ui, &str, &mut String) -> bool,
+    imgui_text: fn(&Ui, &str),
+    imgui_button: fn(&Ui, &str) -> bool,
+    imgui_button_with_size: fn(&Ui, &str, [f32; 2]) -> bool,
+    imgui_slider_i32: fn(&Ui, &str, i32, i32, &mut i32) -> bool,
+    imgui_slider_u32: fn(&Ui, &str, u32, u32, &mut u32) -> bool,
+    imgui_slider_f32: fn(&Ui, &str, f32, f32, &mut f32) -> bool,
+    imgui_cursor_pos: fn(&Ui) -> [f32; 2],
+    imgui_cursor_screen_pos: fn(&Ui) -> [f32; 2],
+    imgui_set_cursor_pos: fn(&Ui, [f32; 2]),
+    imgui_set_cursor_screen_pos: fn(&Ui, [f32; 2]),
+    imgui_checkbox: fn(&Ui, &str, &mut bool) -> bool,
+    imgui_item_rect_size: fn(&Ui) -> [f32; 2],
+    imgui_item_rect_min: fn(&Ui) -> [f32; 2],
+    imgui_item_rect_max: fn(&Ui) -> [f32; 2],
+    imgui_calc_text_size: fn(&Ui, &str) -> [f32; 2],
+    imgui_group: fn(&Ui, Box<dyn FnOnce()>),
+    imgui_input_text_multiline: fn(&Ui, &str, &mut String, [f32; 2]) -> bool,
+    imgui_input_text: fn(&Ui, &str, &mut String) -> bool,
     imgui_activate_font_by_rpath:
         Box<dyn Fn(&Ui, Arc<String>) -> Option<FontStackToken<'_>> + Send + Sync>,
-    imgui_pop_font: extern "Rust" fn(&Ui, FontStackToken<'_>),
-    imgui_dummy: extern "Rust" fn(&Ui, [f32; 2]),
-    imgui_same_line: extern "Rust" fn(&Ui),
-    imgui_window_size: extern "Rust" fn(&Ui) -> [f32; 2],
-    imgui_separator: extern "Rust" fn(&Ui),
-    imgui_background_add_rect: extern "Rust" fn(&Ui, [f32; 2], [f32; 2], f32, bool, [f32; 4]),
-    imgui_window_add_rect: extern "Rust" fn(&Ui, [f32; 2], [f32; 2], f32, bool, [f32; 4]),
-    imgui_window_pos: extern "Rust" fn(&Ui) -> [f32; 2],
-    imgui_set_next_item_width: extern "Rust" fn(&Ui, f32),
-    imgui_columns: extern "Rust" fn(&Ui, i32, &str, bool),
-    imgui_next_column: extern "Rust" fn(&Ui),
-    imgui_set_column_offset: extern "Rust" fn(&Ui, i32, f32),
-    imgui_set_column_width: extern "Rust" fn(&Ui, i32, f32),
-    imgui_current_column_index: extern "Rust" fn(&Ui) -> i32,
-    imgui_current_column_offset: extern "Rust" fn(&Ui) -> f32,
-    imgui_column_width: extern "Rust" fn(&Ui, i32) -> f32,
-    imgui_begin_combo: extern "Rust" fn(&Ui, &str, &str, Box<dyn FnOnce()>),
-    imgui_selectable: extern "Rust" fn(&Ui, &str) -> bool,
-    imgui_set_item_default_focus: extern "Rust" fn(&Ui),
+    imgui_pop_font: fn(&Ui, FontStackToken<'_>),
+    imgui_dummy: fn(&Ui, [f32; 2]),
+    imgui_same_line: fn(&Ui),
+    imgui_window_size: fn(&Ui) -> [f32; 2],
+    imgui_separator: fn(&Ui),
+    imgui_background_add_rect: fn(&Ui, [f32; 2], [f32; 2], f32, bool, [f32; 4]),
+    imgui_window_add_rect: fn(&Ui, [f32; 2], [f32; 2], f32, bool, [f32; 4]),
+    imgui_window_pos: fn(&Ui) -> [f32; 2],
+    imgui_set_next_item_width: fn(&Ui, f32),
+    imgui_columns: fn(&Ui, i32, &str, bool),
+    imgui_next_column: fn(&Ui),
+    imgui_set_column_offset: fn(&Ui, i32, f32),
+    imgui_set_column_width: fn(&Ui, i32, f32),
+    imgui_current_column_index: fn(&Ui) -> i32,
+    imgui_current_column_offset: fn(&Ui) -> f32,
+    imgui_column_width: fn(&Ui, i32) -> f32,
+    imgui_begin_combo: fn(&Ui, &str, &str, Box<dyn FnOnce()>),
+    imgui_selectable: fn(&Ui, &str) -> bool,
+    imgui_set_item_default_focus: fn(&Ui),
 }
 
-/// Arctic Gateways are a plugin system for dynamic which is capable of loading user-created DLLs
-/// and inject a pre-defined function for passing certain functions.
+/// Arctic is a plugin system for dynamic which is capable of loading user-created DLLs
+/// and pass a structure with function wrappers that let you call back to dynamic.
 pub struct Arctic {
     /// Cached DNXFunctions structure.
     cached_functions: OnceLock<Arc<DNXFunctions>>,
@@ -378,7 +378,7 @@ impl Arctic {
     }
 
     /// Injects an Arctic DLL and calls its `arctic_gateway` function.
-    pub fn arctic_inject_gateway(&self, dll_name: String) -> bool {
+    pub fn inject_plugin(&self, dll_name: String) -> bool {
         let config_path = self.base_core.read().get_config().get_path();
         let mut dll_path = String::with_capacity(config_path.len() + dll_name.len());
         dll_path.push_str(config_path);
@@ -408,11 +408,8 @@ impl Arctic {
                 "[ERROR] Can't get the address to arctic_gateway, badly-written plugin!"
             )) as *const ();
 
-        let func: extern "Rust" fn(
-            OwnedProcess,
-            ProcessModule<BorrowedProcess<'static>>,
-            Arc<DNXFunctions>,
-        ) = unsafe { std::mem::transmute(address) };
+        let func: fn(OwnedProcess, ProcessModule<BorrowedProcess<'static>>, Arc<DNXFunctions>) =
+            unsafe { std::mem::transmute(address) };
 
         // Save the DLL and its payload so we remember it.
         let payload = payload
@@ -485,8 +482,11 @@ impl Arctic {
                     if let Some(func) =
                         WinUtils::get_module_symbol_address(&*module_name, c"on_script_received")
                     {
-                        let func: extern "Rust" fn(String) = unsafe { std::mem::transmute(func) };
-                        func(std::mem::take(&mut source));
+                        unsafe {
+                            std::mem::transmute::<usize, fn(String)>(func)(std::mem::take(
+                                &mut source,
+                            ));
+                        }
                     }
                 }
             });

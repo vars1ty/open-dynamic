@@ -11,7 +11,7 @@ use hudhook::{
 };
 use parking_lot::RwLock;
 use std::sync::{atomic::Ordering, Arc, OnceLock};
-use tinyapi32::tinyapi32::POINT;
+use windows_sys::Win32::Foundation::POINT;
 
 /// Simple basic ImGui windows, responsible for also drawing custom windows.
 pub struct DX11UI {
@@ -70,7 +70,7 @@ impl DX11UI {
             code_editor_input: String::default(),
             script_name: String::with_capacity(24),
             community_window: OnceLock::new(),
-            point: POINT::default(),
+            point: POINT { x: 0, y: 0 },
             display_ui: true,
             can_toggle_ui: true,
             crosscom_channel,

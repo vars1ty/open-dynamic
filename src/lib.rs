@@ -32,7 +32,7 @@ use hudhook::{
 };
 use parking_lot::RwLock;
 use std::{ffi::c_void, io::IsTerminal, sync::Arc};
-use tinyapi32::tinyapi32::{AllocConsole, FreeConsole};
+use windows_sys::Win32::System::Console::{AllocConsole, FreeConsole};
 use zstring::ZString;
 
 /// Called when the DLL has been injected/detached.

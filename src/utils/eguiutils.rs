@@ -8,7 +8,7 @@ use dashmap::DashMap;
 use hudhook::imgui::{self, internal::DataTypeKind, sys::*, *};
 use parking_lot::RwLock;
 use std::sync::{Arc, LazyLock};
-use tinyapi32::tinyapi32::POINT;
+use windows_sys::Win32::Foundation::POINT;
 
 #[derive(Default)]
 pub struct ContentFrameData {

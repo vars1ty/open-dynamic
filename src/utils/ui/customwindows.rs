@@ -1,6 +1,6 @@
 use crate::mod_cores::base_core::BaseCore;
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils};
-use crate::winutils::WinUtils;
+use crate::winutils::{POINTWrapper, WinUtils};
 use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
 use hudhook::imgui::{self, Condition, TextureId};
@@ -12,7 +12,6 @@ use std::{
     cell::{Cell, RefCell},
     sync::Arc,
 };
-use tinyapi32::tinyapi32::POINT;
 use zstring::ZString;
 
 /// # Safety
@@ -43,7 +42,7 @@ pub struct CustomWindowsUtils {
 
     /// Current cursor point.
     /// Allowed to be non-thread-safe as it doesn't matter.
-    point: Cell<POINT>,
+    point: Cell<POINTWrapper>,
 
     /// Widgets that should remain hidden.
     hidden_widgets: Mutex<Vec<String>>,
@@ -115,7 +114,7 @@ impl CustomWindowsUtils {
                 .build(|| {
                     self.call_ui_event_on_arctic(ui, custom_window, Arc::clone(&base_core), false);
                     self.draw_custom_window(Arc::clone(&base_core), &widgets, ui);
-                    ImGuiUtils::render_software_cursor(ui, &mut self.point.get());
+                    ImGuiUtils::render_software_cursor(ui, &mut self.point.get().0);
                 });
         }
     }
@@ -198,6 +197,7 @@ impl CustomWindowsUtils {
                 };
 
                 if let Err(error) = function
+                    // Syntax: fn(opt_param) { }
                     .call::<(Option<&Value>,), ()>((opt_param.as_ref(),))
                     .into_result()
                 {
@@ -374,9 +374,9 @@ impl CustomWindowsUtils {
 
         if !window_titles.contains(&from) {
             crash!(
-                "[ERROR] The specified window by name \"",
+                "[ERROR] The specified window \"",
                 from,
-                "\" does not exist, how do you want me to rename something that doesn't exist retard?"
+                "\" does not exist!"
             );
         }
 
@@ -537,72 +537,33 @@ impl CustomWindowsUtils {
     }
 
     /// Attempts to get the value of a f32-slider in the currently-active window.
-    pub fn get_f32_slider_value(&self, identifier: String) -> f32 {
-        let Some(widget) = self.get_widget(&identifier) else {
-            log!(
-                "[ERROR] Couldn't find any widgets named \"",
-                identifier,
-                "\"!"
-            );
-            return 0.0;
+    pub fn get_f32_slider_value(&self, identifier: String) -> Option<f32> {
+        let WidgetType::F32Slider(_, _, _, current_value) = *self.get_widget(&identifier)?.borrow()
+        else {
+            return None;
         };
 
-        let WidgetType::F32Slider(_, _, _, current_value) = *widget.borrow() else {
-            log!(
-                "[ERROR] Couldn't find any f32-sliders with the name of \"",
-                identifier,
-                "\"!"
-            );
-            return 0.0;
-        };
-
-        current_value
+        Some(current_value)
     }
 
     /// Attempts to get the value of a i32-slider in the currently-active window.
-    pub fn get_i32_slider_value(&self, identifier: String) -> i32 {
-        let Some(widget) = self.get_widget(&identifier) else {
-            log!(
-                "[ERROR] Couldn't find any widgets named \"",
-                identifier,
-                "\"!"
-            );
-            return 0;
+    pub fn get_i32_slider_value(&self, identifier: String) -> Option<i32> {
+        let WidgetType::I32Slider(_, _, _, current_value) = *self.get_widget(&identifier)?.borrow()
+        else {
+            return None;
         };
 
-        let WidgetType::I32Slider(_, _, _, current_value) = *widget.borrow() else {
-            log!(
-                "[ERROR] Couldn't find any i32-sliders with the name of \"",
-                identifier,
-                "\"!"
-            );
-            return 0;
-        };
-
-        current_value
+        Some(current_value)
     }
 
     /// Attempts to get the value of a i32-slider in the currently-active window.
-    pub fn get_input_text_multiline_value(&self, identifier: String) -> String {
-        let Some(widget) = self.get_widget(&identifier) else {
-            log!(
-                "[ERROR] Couldn't find any widgets named \"",
-                identifier,
-                "\"!"
-            );
-            return String::default();
-        };
-
+    pub fn get_input_text_multiline_value(&self, identifier: String) -> Option<String> {
+        let widget = self.get_widget(&identifier)?;
         let WidgetType::InputTextMultiLine(_, input, _, _) = &*widget.borrow() else {
-            log!(
-                "[ERROR] Couldn't find any multiline text input fields with the name of \"",
-                identifier,
-                "\"!"
-            );
-            return String::default();
+            return None;
         };
 
-        input.to_owned()
+        Some(input.to_owned())
     }
 
     /// Sets the window constraints for the currently focused window.

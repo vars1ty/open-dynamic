@@ -27,8 +27,8 @@ use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},
 };
-use tinyapi32::tinyapi32::GetCurrentProcess;
 use windows::Win32::Foundation::HANDLE;
+use windows_sys::Win32::System::Threading::GetCurrentProcess;
 use wmem::Memory;
 
 /// System modules, like Memory operations and such.
@@ -367,13 +367,13 @@ impl SystemModules {
     }
 
     /// Adds `add` to the pointer, then returns the new value.
-    fn ptr_add(address: i64, add: usize) -> i64 {
-        unsafe { (address as *const i64).byte_add(add) as i64 }
+    fn ptr_add(address: i64, add: i64) -> i64 {
+        address + add
     }
 
     /// Subtracts `sub` from the pointer, then returns the new value.
-    fn ptr_sub(address: i64, sub: usize) -> i64 {
-        unsafe { (address as *const i64).byte_sub(sub) as i64 }
+    fn ptr_sub(address: i64, sub: i64) -> i64 {
+        address + sub
     }
 
     /// Scans for a pattern in memory.
@@ -417,7 +417,7 @@ impl SystemModules {
 
         if let Ok(data_i64) = data.as_integer().into_result() {
             if let Err(error) = Memory::write(
-                &HANDLE(unsafe { GetCurrentProcess() }),
+                &HANDLE(unsafe { GetCurrentProcess() } as isize),
                 address as _,
                 &(data_i64 as i32),
                 None,
@@ -430,7 +430,7 @@ impl SystemModules {
 
         if let Ok(data_usize) = data.as_usize().into_result() {
             if let Err(error) = Memory::write(
-                &HANDLE(unsafe { GetCurrentProcess() }),
+                &HANDLE(unsafe { GetCurrentProcess() } as isize),
                 address as _,
                 &data_usize,
                 None,
@@ -443,7 +443,7 @@ impl SystemModules {
 
         if let Ok(data_f64) = data.as_float().into_result() {
             if let Err(error) = Memory::write(
-                &HANDLE(unsafe { GetCurrentProcess() }),
+                &HANDLE(unsafe { GetCurrentProcess() } as isize),
                 address as _,
                 &(data_f64 as f32),
                 None,
@@ -482,7 +482,7 @@ impl SystemModules {
         });
 
         if let Err(error) = Memory::write(
-            &HANDLE(unsafe { GetCurrentProcess() }),
+            &HANDLE(unsafe { GetCurrentProcess() } as isize),
             address as _,
             &bytes,
             Some(bytes.len()),

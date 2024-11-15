@@ -1,15 +1,11 @@
 use crate::{
     globals::{SafeMODULEENTRY32, LOGGED_MESSAGES, MODULES},
-    utils::{
-        crosscom::CrossCom, extensions::OptionExt,
-        scripting::rune_ext_structs::RuneDoubleResultPrimitive, types::char_ptr,
-    },
+    utils::{crosscom::CrossCom, extensions::OptionExt, types::char_ptr},
 };
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use rune::Any;
 use std::{collections::HashMap, ffi::*, os::windows::prelude::OsStringExt, sync::Arc};
-use tinyapi32::tinyapi32::*;
 use windows::{
     core::PCSTR,
     System::VirtualKey,
@@ -18,8 +14,24 @@ use windows::{
         System::{Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*},
     },
 };
+use windows_sys::Win32::{
+    Foundation::POINT,
+    Graphics::Gdi::ScreenToClient,
+    System::Threading::GetCurrentProcess,
+    UI::{Input::KeyboardAndMouse::GetAsyncKeyState, WindowsAndMessaging::*},
+};
 use wmem::Memory;
 use zstring::ZString;
+
+/// Wrapper around `POINT` which implements `Default`.
+#[derive(Clone, Copy)]
+pub struct POINTWrapper(pub POINT);
+
+impl Default for POINTWrapper {
+    fn default() -> Self {
+        Self(POINT { x: 0, y: 0 })
+    }
+}
 
 /// Renderer enum for determing the render target for an unsupported game.
 #[derive(Debug, Default)]
@@ -153,7 +165,7 @@ impl WinUtils {
     /// Not a safe function by design, but not marked as unsafe as it does try and ensure some form
     /// of safety.
     pub fn ptr_to_string(ptr: char_ptr) -> Option<&'static str> {
-        Memory::ptr_to_string(&HANDLE(unsafe { GetCurrentProcess() }), ptr)
+        Memory::ptr_to_string(&HANDLE(unsafe { GetCurrentProcess() } as isize), ptr)
     }
 
     /// Gets a module by its non-exact name.
@@ -384,7 +396,7 @@ impl WinUtils {
 
     /// Returns the cursor position within the foreground window.
     pub fn get_cursor_pos() -> POINT {
-        let mut point = POINT::default();
+        let mut point = POINT { x: 0, y: 0 };
         Self::get_cursor_pos_recycle(&mut point);
         point
     }
