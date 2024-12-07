@@ -168,6 +168,9 @@ impl SystemModules {
             .function("fn_call", FNCaller::call_auto)
             .build()?;
         memory_module
+            .function("fn_call_raw", FNCaller::call_auto_raw)
+            .build()?;
+        memory_module
             .function("hook_function", RDetour::install_detour_auto)
             .build()?;
         memory_module
@@ -678,17 +681,27 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_f32_slider", |identifier, text, min, max| {
-                custom_window_utils
-                    .add_widget(identifier, WidgetType::F32Slider(text, min, max, min))
-            })
+            .function(
+                "add_f32_slider",
+                |identifier, text, (min, max), function, opt_param| {
+                    custom_window_utils.add_widget(
+                        identifier,
+                        WidgetType::F32Slider(text, min, max, min, Rc::new(function), opt_param),
+                    )
+                },
+            )
             .build()?;
 
         module
-            .function("add_i32_slider", |identifier, text, min, max| {
-                custom_window_utils
-                    .add_widget(identifier, WidgetType::I32Slider(text, min, max, min))
-            })
+            .function(
+                "add_i32_slider",
+                |identifier, text, (min, max), function, opt_param| {
+                    custom_window_utils.add_widget(
+                        identifier,
+                        WidgetType::I32Slider(text, min, max, min, Rc::new(function), opt_param),
+                    )
+                },
+            )
             .build()?;
 
         module

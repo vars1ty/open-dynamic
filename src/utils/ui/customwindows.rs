@@ -1,4 +1,5 @@
 use crate::mod_cores::base_core::BaseCore;
+use crate::utils::stringutils::StringUtils;
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils};
 use crate::winutils::{POINTWrapper, WinUtils};
 use atomic_refcell::AtomicRefCell;
@@ -8,10 +9,7 @@ use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rune::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{
-    cell::{Cell, RefCell},
-    sync::Arc,
-};
+use std::{cell::Cell, sync::Arc};
 use zstring::ZString;
 
 /// # Safety
@@ -49,10 +47,10 @@ pub struct CustomWindowsUtils {
 
     /// If `Some(String)`, all widgets that get added next will be added into the defined centered
     /// widget parent/holder.
-    add_into_centered: RefCell<Option<String>>,
+    add_into_centered: AtomicRefCell<Option<String>>,
 
     /// Pending scripts to be executed on the next UI draw call.
-    pending_scripts: RefCell<Option<Vec<String>>>,
+    pending_scripts: AtomicRefCell<Option<Vec<String>>>,
 }
 
 thread_safe_structs!(CustomWindowsUtils);
@@ -197,7 +195,6 @@ impl CustomWindowsUtils {
                 };
 
                 if let Err(error) = function
-                    // Syntax: fn(opt_param) { }
                     .call::<(Option<&Value>,), ()>((opt_param.as_ref(),))
                     .into_result()
                 {
@@ -216,11 +213,35 @@ impl CustomWindowsUtils {
             }
             WidgetType::Spacing(x, y) => ui.dummy([*x, *y]),
             WidgetType::Separator => ui.separator(),
-            WidgetType::F32Slider(text, min, max, current_value) => {
-                slider!(ui, text, *min, *max, *current_value);
+            WidgetType::F32Slider(text, min, max, current_value, callback, opt_param) => {
+                if slider!(ui, text, *min, *max, *current_value) {
+                    if let Err(error) = callback
+                        .call::<(f32, Option<&Value>), ()>((*current_value, opt_param.as_ref()))
+                        .into_result()
+                    {
+                        log!(
+                            "[ERROR] Failed calling f32 slider function on \"",
+                            identifier,
+                            "\", error: ",
+                            error
+                        );
+                    }
+                }
             }
-            WidgetType::I32Slider(text, min, max, current_value) => {
-                slider!(ui, text, *min, *max, *current_value);
+            WidgetType::I32Slider(text, min, max, current_value, callback, opt_param) => {
+                if slider!(ui, text, *min, *max, *current_value) {
+                    if let Err(error) = callback
+                        .call::<(i32, Option<&Value>), ()>((*current_value, opt_param.as_ref()))
+                        .into_result()
+                    {
+                        log!(
+                            "[ERROR] Failed calling i32 slider function on \"",
+                            identifier,
+                            "\", error: ",
+                            error
+                        );
+                    }
+                }
             }
             WidgetType::NextWidgetWidth(width) => ui.set_next_item_width(*width),
             WidgetType::SameLine => ui.same_line(),
@@ -400,10 +421,12 @@ impl CustomWindowsUtils {
     }
 
     /// Adds a widget to the currently selected custom window.
-    pub fn add_widget(&self, identifier: String, widget_type: WidgetType) {
+    pub fn add_widget(&self, mut identifier: String, widget_type: WidgetType) {
         if identifier.is_empty() {
-            log!("[ERROR] A widget identifier is empty!");
-            return;
+            // Empty identifier, use a "random" string.
+            // Identifier should really be an Option<String>, but that's reserved for the future if
+            // anything due to compatibility reasons.
+            identifier = StringUtils::get_random();
         }
 
         // If auto-center is enabled and assuming the identifier for it isn't empty, center the
@@ -538,7 +561,8 @@ impl CustomWindowsUtils {
 
     /// Attempts to get the value of a f32-slider in the currently-active window.
     pub fn get_f32_slider_value(&self, identifier: String) -> Option<f32> {
-        let WidgetType::F32Slider(_, _, _, current_value) = *self.get_widget(&identifier)?.borrow()
+        let WidgetType::F32Slider(_, _, _, current_value, _, _) =
+            *self.get_widget(&identifier)?.borrow()
         else {
             return None;
         };
@@ -548,7 +572,8 @@ impl CustomWindowsUtils {
 
     /// Attempts to get the value of a i32-slider in the currently-active window.
     pub fn get_i32_slider_value(&self, identifier: String) -> Option<i32> {
-        let WidgetType::I32Slider(_, _, _, current_value) = *self.get_widget(&identifier)?.borrow()
+        let WidgetType::I32Slider(_, _, _, current_value, _, _) =
+            *self.get_widget(&identifier)?.borrow()
         else {
             return None;
         };
@@ -690,8 +715,7 @@ impl CustomWindowsUtils {
                 continue;
             };
 
-            let func: extern "Rust" fn(*const i64, &str, bool) =
-                unsafe { std::mem::transmute(func) };
+            let func: fn(*const i64, &str, bool) = unsafe { std::mem::transmute(func) };
             func(std::ptr::addr_of!(ui) as _, window_name, is_pre);
         }
     }
@@ -709,7 +733,7 @@ impl CustomWindowsUtils {
     }
 
     /// Gets the pending scripts to be executed.
-    pub const fn get_pending_scripts(&self) -> &RefCell<Option<Vec<String>>> {
+    pub const fn get_pending_scripts(&self) -> &AtomicRefCell<Option<Vec<String>>> {
         &self.pending_scripts
     }
 

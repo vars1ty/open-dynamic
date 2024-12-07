@@ -1,6 +1,7 @@
 #![feature(stmt_expr_attributes)]
 #![feature(optimize_attribute)]
 #![feature(c_variadic)]
+#![feature(let_chains)]
 
 #[macro_use]
 extern crate obfstr;

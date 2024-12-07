@@ -172,6 +172,7 @@ impl Arctic {
                     .try_read()
                     .unwrap_or_crash(zencstr!("[ERROR] Failed reading BaseCore!"));
 
+
                 let crosscom_check_is_ex_serial_ok = base_core_reader.get_crosscom();
                 let crosscom_server_aob_scan = base_core_reader.get_crosscom();
                 let crosscom_seerver_get_variable = base_core_reader.get_crosscom();
@@ -477,19 +478,25 @@ impl Arctic {
         let injected_dlls = self.get_injected_dlls();
         reader
             .get_network_listener()
-            .hook_on_script_received(crosscom, move |mut source| {
-                for module_name in &*injected_dlls {
-                    if let Some(func) =
-                        WinUtils::get_module_symbol_address(&*module_name, c"on_script_received")
-                    {
-                        unsafe {
-                            std::mem::transmute::<usize, fn(String)>(func)(std::mem::take(
-                                &mut source,
-                            ));
-                        }
-                    }
-                }
+            .hook_on_script_received(crosscom, move |source| {
+                Self::call_on_script_received(&injected_dlls, source);
             });
+    }
+
+    /// Calls `on_script_received` on all plugins with the specified source.
+    fn call_on_script_received(
+        injected_dlls: &Arc<DashMap<ProcessModule<BorrowedProcess<'static>>, String>>,
+        mut source: String,
+    ) {
+        for module_name in &**injected_dlls {
+            if let Some(func) =
+                WinUtils::get_module_symbol_address(&*module_name, c"on_script_received")
+            {
+                unsafe {
+                    std::mem::transmute::<usize, fn(String)>(func)(std::mem::take(&mut source));
+                }
+            }
+        }
     }
 
     /// Checks if a gateway/plugin is currently active.

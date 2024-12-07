@@ -52,8 +52,6 @@ impl NetworkListener {
         crosscom: Arc<RwLock<CrossCom>>,
         callback: F,
     ) {
-        // Using AsyncUtils here causes it to crash randomly after the manual mapping
-        // implementation.
         let crossbeam_chanel = Arc::clone(&self.crossbeam_channel);
         std::thread::spawn(move || {
             loop {
@@ -70,7 +68,7 @@ impl NetworkListener {
                                 continue;
                             }
 
-                            callback(script)
+                            callback(script);
                         }
                         _ => {
                             // Not SendScripts, send the message back to Crossbeam.

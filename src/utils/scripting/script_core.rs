@@ -55,7 +55,7 @@ pub struct ScriptCore {
 thread_safe_structs!(ScriptCore);
 
 impl ScriptCore {
-    /// Initializes the cached compilations `AHashMap`, boosting overall performance.
+    /// Initializes everything needed for the Rune implementation to work.
     pub fn init() -> Self {
         Self {
             vm_string_settings: ["pub fn main()", "import"],
@@ -124,10 +124,6 @@ impl ScriptCore {
             // Auto doesn't realize this.
             let mut writer = StandardStream::stderr(ColorChoice::Never);
             diagnostics.emit(&mut writer, &sources)?;
-        }
-
-        if let Err(error) = &result {
-            log!("[ERROR] Compile Error in unit: ", error);
         }
 
         let unit = result?;
@@ -238,22 +234,15 @@ impl ScriptCore {
                 return;
             };
 
-            // Notify that the script is executing.
             log!("[Script Engine] Script finished executing!");
-
-            // Send to party.
-            if send_src_to_network {
-                if let Some(reader) = crosscom.try_read() {
-                    reader.send_script(&source);
-                }
+            if send_src_to_network && let Some(reader) = crosscom.try_read() {
+                reader.send_script(&source);
             }
         };
 
         if use_new_thread {
             log!("[Script Engine] Running script on a new thread...");
-            std::thread::spawn(move || {
-                code();
-            });
+            std::thread::spawn(move || code);
             return;
         }
 

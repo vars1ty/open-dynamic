@@ -7,15 +7,14 @@ use rune::Value;
 pub struct FNCaller;
 
 impl FNCaller {
-    /// Takes the function pointer and the parameters as a `Vec<Value>`, then automatically
-    /// converts it into a `Vec<i64>`.
+    /// Takes the function pointer and the paramaters in form of a `Vec<i64>`.
     /// If there are more than 10 entries in `params`, this function sends an error message
     /// and returns 0.
     /// If below or equal to 10 entries, the correct `call_xx` function is found and called.
     /// # Design
     /// This could be done via `c_variadic`, but it causes too many undefined behaviors due to
     /// always passing more parameters than needed.
-    pub fn call_auto(fn_ptr: i64, params: Vec<Value>) -> i64 {
+    pub fn call_auto_raw(fn_ptr: i64, params: Vec<i64>) -> i64 {
         let params_len = params.len();
         if params_len > 10 {
             log!("[ERROR] Max amount of parameters reached, keep it below (or eq. to) 10!");
@@ -26,17 +25,6 @@ impl FNCaller {
             );
             return 0;
         }
-
-        let params: Vec<i64> = params
-            .iter()
-            .map(|value| {
-                ScriptCore::value_as_ptr(value).unwrap_or_crash(zencstr!(
-                    "[ERROR] Couldn't get the pointer of \"",
-                    format!("{value:?}"),
-                    "\"!"
-                )) as i64
-            })
-            .collect();
 
         match params_len {
             0 => Self::call(fn_ptr),
@@ -71,6 +59,36 @@ impl FNCaller {
                 " parameters, expected 10 or less, closing."
             ),
         }
+    }
+
+    /// Same as `call_auto_raw`, but takes all values in the vector as a Rune `Value` and turns it
+    /// into the native pointer.
+    /// This is recommended for when you don't want to get the pointer of each value manually, but
+    /// discouraged when you are passing pre-defined pointers into it.
+    pub fn call_auto(fn_ptr: i64, params: Vec<Value>) -> i64 {
+        let params_len = params.len();
+        if params_len > 10 {
+            log!("[ERROR] Max amount of parameters reached, keep it below (or eq. to) 10!");
+            log!(
+                "[ERROR] Got ",
+                params_len,
+                " parameters, expected 10 or less, returning 0."
+            );
+            return 0;
+        }
+
+        let params: Vec<i64> = params
+            .iter()
+            .map(|value| {
+                ScriptCore::value_as_ptr(value).unwrap_or_crash(zencstr!(
+                    "[ERROR] Couldn't get the pointer of \"",
+                    format!("{value:?}"),
+                    "\"!"
+                )) as i64
+            })
+            .collect();
+
+        Self::call_auto_raw(fn_ptr, params)
     }
 
     pub fn call(fn_ptr: i64) -> i64 {

@@ -49,6 +49,23 @@ macro_rules! zencstr {
     };
 }
 
+/// Clone of `zencstr`, but takes the encrypted `String` and returns it.
+#[macro_export]
+macro_rules! ozencstr {
+    ($arg:literal) => {
+        std::mem::take(&mut $crate::zstring::ZString::new(encrypt_arg!($arg)).data)
+    };
+    ($($arg:expr),*) => {
+        {
+            let mut output = $crate::zstring::ZString::default();
+            $(
+                output.push_zstring($crate::zstring::ZString::new(encrypt_arg!($arg).to_string()));
+            )*
+            std::mem::take(&mut output.data)
+        }
+    };
+}
+
 /// Crashes the program after 5 seconds of displaying a custom message.
 #[macro_export]
 macro_rules! crash {

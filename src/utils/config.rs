@@ -58,16 +58,13 @@ impl Default for Config {
             })
         });
 
-        let default_cfg_serials =
-            vec![
-                serde_jsonc::to_value(std::mem::take(&mut zencstr!("FREE-ACCESS").data))
-                    .unwrap_or_else(|error| {
-                        crash!(
-                            "[ERROR] Failed creating default_cfg_serials, error: ",
-                            error
-                        )
-                    }),
-            ];
+        let default_cfg_serials = vec![serde_jsonc::to_value(ozencstr!("FREE-ACCESS"))
+            .unwrap_or_else(|error| {
+                crash!(
+                    "[ERROR] Failed creating default_cfg_serials, error: ",
+                    error
+                )
+            })];
 
         let cfg_serials = cached_config_ref[&zencstr!("serials").data]
             .as_array()
@@ -89,7 +86,7 @@ impl Default for Config {
 
         if serials.is_empty() {
             log!("[WARN] No serials present, using free version!");
-            serials.push(std::mem::take(&mut zencstr!("FREE-ACCESS").data));
+            serials.push(ozencstr!("FREE-ACCESS"));
         }
 
         let detect_deadlocks = cached_config_ref[&zencstr!("detect_deadlocks").data]

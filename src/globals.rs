@@ -1,11 +1,10 @@
+use crate::winutils::WinUtils;
 use ahash::AHashMap;
 use atomic_float::AtomicF32;
 use parking_lot::Mutex;
 use std::sync::{atomic::AtomicBool, LazyLock};
 use windows::Win32::System::Diagnostics::ToolHelp::MODULEENTRY32;
 use zstring::ZString;
-
-use crate::winutils::WinUtils;
 
 /// Safe wrapper around MODULEENTRY32.
 pub struct SafeMODULEENTRY32(pub MODULEENTRY32);

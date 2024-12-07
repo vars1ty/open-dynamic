@@ -174,25 +174,24 @@ impl CrossCom {
         // Setup server.
         let (handler, listener) = node::split();
 
-        let mut server_address = if self.use_local_server {
+        let server_address = if self.use_local_server {
             log!("## Development: Using local server at port 8391!");
-            zencstr!("0.0.0.0:8391")
+            ozencstr!("0.0.0.0:8391")
         } else {
-            zencstr!(include_str!("../../crosscom_ip").replace(['\n', '\r'], ""))
+            ozencstr!(include_str!("../../crosscom_ip").replace(['\n', '\r'], ""))
         };
 
         // Connect via FramedTcp.
-        if let Err(error) = handler.network().connect(
-            Transport::FramedTcp,
-            std::mem::take(&mut server_address.data),
-        ) {
+        if let Err(error) = handler
+            .network()
+            .connect(Transport::FramedTcp, server_address)
+        {
             crash!(
                 "[ERROR] Couldn't connect to server, report the following message: ",
                 error
             );
         }
 
-        drop(server_address);
         self.set_state(CrossComState::Connecting);
         listener.for_each(move |event| match event {
             NodeEvent::Network(net_event) => match net_event {

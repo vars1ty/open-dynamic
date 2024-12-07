@@ -86,7 +86,7 @@ impl RDetour {
         }
 
         #[cfg(target_pointer_width = "32")]
-        log!("[WARN] RDetours ready, note that 32-bit is more unstable with c_variadic-forced hooks!");
+        log!("[WARN] RDetours ready, note that 32-bit is not stable with c_variadic-forced hooks!");
     }
 
     /// Registers a new detour at ID `detour_id - 1` in `RUNE_DETOURS`.
