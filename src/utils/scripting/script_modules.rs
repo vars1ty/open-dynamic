@@ -652,12 +652,32 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_button", |identifier, text, function, opt_param| {
-                custom_window_utils.add_widget(
-                    identifier,
-                    WidgetType::Button(text, Rc::new(function), opt_param),
-                )
+            .function("update_label", |identifier, new_text| {
+                custom_window_utils.update_label(identifier, new_text)
             })
+            .build()?;
+
+        module
+            .function(
+                "add_button",
+                |identifier: String, text, function: Function, opt_param| {
+                    custom_window_utils.add_widget(
+                        identifier.to_owned(),
+                        WidgetType::Button(
+                            text,
+                            Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
+                                crash!(
+                                    "[ERROR Failed turning Function into SyncFunction at \"",
+                                    identifier,
+                                    "\", error: ",
+                                    error
+                                )
+                            })),
+                            Rc::new(opt_param),
+                        ),
+                    )
+                },
+            )
             .build()?;
 
         module
@@ -683,10 +703,24 @@ impl UIModules {
         module
             .function(
                 "add_f32_slider",
-                |identifier, text, (min, max), function, opt_param| {
+                |identifier: String, text, (min, max), function: Function, opt_param| {
                     custom_window_utils.add_widget(
-                        identifier,
-                        WidgetType::F32Slider(text, min, max, min, Rc::new(function), opt_param),
+                        identifier.to_owned(),
+                        WidgetType::F32Slider(
+                            text,
+                            min,
+                            max,
+                            min,
+                            Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
+                                crash!(
+                                    "[ERROR Failed turning Function into SyncFunction at \"",
+                                    identifier,
+                                    "\", error: ",
+                                    error
+                                )
+                            })),
+                            Rc::new(opt_param),
+                        ),
                     )
                 },
             )
@@ -695,10 +729,24 @@ impl UIModules {
         module
             .function(
                 "add_i32_slider",
-                |identifier, text, (min, max), function, opt_param| {
+                |identifier: String, text, (min, max), function: Function, opt_param| {
                     custom_window_utils.add_widget(
-                        identifier,
-                        WidgetType::I32Slider(text, min, max, min, Rc::new(function), opt_param),
+                        identifier.to_owned(),
+                        WidgetType::I32Slider(
+                            text,
+                            min,
+                            max,
+                            min,
+                            Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
+                                crash!(
+                                    "[ERROR Failed turning Function into SyncFunction at \"",
+                                    identifier,
+                                    "\", error: ",
+                                    error
+                                )
+                            })),
+                            Rc::new(opt_param),
+                        ),
                     )
                 },
             )
@@ -851,6 +899,12 @@ impl UIModules {
         module
             .function("is_cursor_in_ui", || {
                 IS_CURSOR_IN_UI.load(Ordering::Relaxed)
+            })
+            .build()?;
+
+        module
+            .function("has_widget", |identifier: String| {
+                custom_window_utils.get_widget(&identifier).is_some()
             })
             .build()?;
 

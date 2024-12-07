@@ -1,4 +1,5 @@
 use crate::mod_cores::base_core::BaseCore;
+use crate::utils::extensions::OptionExt;
 use crate::utils::stringutils::StringUtils;
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils};
 use crate::winutils::{POINTWrapper, WinUtils};
@@ -7,7 +8,12 @@ use dashmap::DashMap;
 use hudhook::imgui::{self, Condition, TextureId};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
+use rune::alloc::clone::TryClone;
+use rune::runtime::{Function, SyncFunction};
 use rune::Value;
+use std::cell::OnceCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{cell::Cell, sync::Arc};
 use zstring::ZString;
@@ -17,6 +23,17 @@ use zstring::ZString;
 /// whether or not the value can be borrowed as mutable, or as a reference.
 /// If it can't and assuming there is a check, the code returns and doesn't panic.
 type WidgetsMap = IndexMap<String, Arc<AtomicRefCell<WidgetType>>>;
+
+/// Type of callback that's meant for the function.
+#[derive(Default)]
+enum CallbackType {
+    #[default]
+    None,
+
+    Button(String, Rc<Option<Value>>),
+    I32Slider(String, i32, Rc<Option<Value>>),
+    F32Slider(String, f32, Rc<Option<Value>>),
+}
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
 /// instances of them.
@@ -51,6 +68,12 @@ pub struct CustomWindowsUtils {
 
     /// Pending scripts to be executed on the next UI draw call.
     pending_scripts: AtomicRefCell<Option<Vec<String>>>,
+
+    /// Pending callbacks for buttons and sliders, as executing them at the same frame in the UI
+    /// can cause deadlocks.
+    /// No `*Map` because it requires traits which aren't implemented for `*Function` in order to
+    /// add entries.
+    pending_callbacks: Mutex<Vec<(Rc<SyncFunction>, CallbackType)>>,
 }
 
 thread_safe_structs!(CustomWindowsUtils);
@@ -91,7 +114,9 @@ impl CustomWindowsUtils {
                 .iter()
                 .enumerate()
                 .find(|(_, window_title)| *window_title == custom_window)
-                .and_then(|(found_index, _)| self.window_widgets.get(&found_index))
+                .and_then(|(found_index, _)| {
+                    self.window_widgets.try_get(&found_index).try_unwrap()
+                })
             else {
                 continue;
             };
@@ -99,8 +124,6 @@ impl CustomWindowsUtils {
             let Some(size_constraints) = window_size_constraints.get(index) else {
                 continue;
             };
-
-            self.call_ui_event_on_arctic(ui, custom_window, Arc::clone(&base_core), true);
 
             ui.window(&**custom_window)
                 .size(DEFAULT_SIZE, Condition::FirstUseEver)
@@ -110,11 +133,73 @@ impl CustomWindowsUtils {
                 )
                 .collapsed(true, Condition::Once)
                 .build(|| {
-                    self.call_ui_event_on_arctic(ui, custom_window, Arc::clone(&base_core), false);
                     self.draw_custom_window(Arc::clone(&base_core), &widgets, ui);
                     ImGuiUtils::render_software_cursor(ui, &mut self.point.get().0);
                 });
         }
+
+        self.call_pending_callbacks();
+    }
+
+    /// Calls all pending callbacks.
+    fn call_pending_callbacks(&self) {
+        let Some(mut pending_callbacks) = self.pending_callbacks.try_lock() else {
+            log!("[ERROR] Pending callbacks is locked and cannot be accessed!");
+            return;
+        };
+
+        for (callback, callback_type) in &*pending_callbacks {
+            match callback_type {
+                CallbackType::Button(identifier, opt_param) => {
+                    if let Err(error) = callback
+                        .call::<(Option<&Value>,), ()>((opt_param.as_ref().as_ref(),))
+                        .into_result()
+                    {
+                        log!(
+                            "[ERROR] Failed calling button function on \"",
+                            identifier,
+                            "\", error: ",
+                            error
+                        );
+                    }
+                }
+                CallbackType::I32Slider(identifier, current_value, opt_param) => {
+                    if let Err(error) = callback
+                        .call::<(i32, Option<&Value>), ()>((
+                            *current_value,
+                            opt_param.as_ref().as_ref(),
+                        ))
+                        .into_result()
+                    {
+                        log!(
+                            "[ERROR] Failed calling i32 slider function on \"",
+                            identifier,
+                            "\", error: ",
+                            error
+                        );
+                    }
+                }
+                CallbackType::F32Slider(identifier, current_value, opt_param) => {
+                    if let Err(error) = callback
+                        .call::<(f32, Option<&Value>), ()>((
+                            *current_value,
+                            opt_param.as_ref().as_ref(),
+                        ))
+                        .into_result()
+                    {
+                        log!(
+                            "[ERROR] Failed calling i32 slider function on \"",
+                            identifier,
+                            "\", error: ",
+                            error
+                        );
+                    }
+                }
+                _ => crash!("[ERROR] Invalid callback type!"),
+            }
+        }
+
+        pending_callbacks.clear();
     }
 
     /// Draws a custom window.
@@ -189,22 +274,14 @@ impl CustomWindowsUtils {
                 label!(ui, content);
                 font_token.pop();
             }
-            WidgetType::Button(text, function, opt_param) => {
-                if !button!(ui, text) {
-                    return;
-                };
-
-                if let Err(error) = function
-                    .call::<(Option<&Value>,), ()>((opt_param.as_ref(),))
-                    .into_result()
-                {
-                    log!(
-                        "[ERROR] Failed calling button function on \"",
+            WidgetType::Button(text, callback, opt_param) => {
+                if button!(ui, text) {
+                    self.add_callback(
                         identifier,
-                        "\", error: ",
-                        error
+                        callback,
+                        CallbackType::Button(identifier.to_owned(), Rc::clone(opt_param)),
                     );
-                }
+                };
             }
             WidgetType::LegacyButton(text, rune_code) => {
                 if button!(ui, text) && !rune_code.is_empty() {
@@ -215,32 +292,28 @@ impl CustomWindowsUtils {
             WidgetType::Separator => ui.separator(),
             WidgetType::F32Slider(text, min, max, current_value, callback, opt_param) => {
                 if slider!(ui, text, *min, *max, *current_value) {
-                    if let Err(error) = callback
-                        .call::<(f32, Option<&Value>), ()>((*current_value, opt_param.as_ref()))
-                        .into_result()
-                    {
-                        log!(
-                            "[ERROR] Failed calling f32 slider function on \"",
-                            identifier,
-                            "\", error: ",
-                            error
-                        );
-                    }
+                    self.add_callback(
+                        identifier,
+                        callback,
+                        CallbackType::F32Slider(
+                            identifier.to_owned(),
+                            *current_value,
+                            Rc::clone(opt_param),
+                        ),
+                    );
                 }
             }
             WidgetType::I32Slider(text, min, max, current_value, callback, opt_param) => {
                 if slider!(ui, text, *min, *max, *current_value) {
-                    if let Err(error) = callback
-                        .call::<(i32, Option<&Value>), ()>((*current_value, opt_param.as_ref()))
-                        .into_result()
-                    {
-                        log!(
-                            "[ERROR] Failed calling i32 slider function on \"",
-                            identifier,
-                            "\", error: ",
-                            error
-                        );
-                    }
+                    self.add_callback(
+                        identifier,
+                        callback,
+                        CallbackType::I32Slider(
+                            identifier.to_owned(),
+                            *current_value,
+                            Rc::clone(opt_param),
+                        ),
+                    );
                 }
             }
             WidgetType::NextWidgetWidth(width) => ui.set_next_item_width(*width),
@@ -309,6 +382,31 @@ impl CustomWindowsUtils {
                     .build();
             }
         }
+    }
+
+    /// Adds a callback to `self.pending_callbacks`.
+    fn add_callback(
+        &self,
+        identifier: &str,
+        callback: &Rc<SyncFunction>,
+        callback_type: CallbackType,
+    ) {
+        let Some(mut pending_callbacks) = self.pending_callbacks.try_lock() else {
+            log!("[ERROR] Pending callbacks is locked and cannot be accessed!");
+            return;
+        };
+
+        pending_callbacks.push((
+            callback.try_clone().unwrap_or_else(|error| {
+                crash!(
+                    "[ERROR] Failed cloning function named \"",
+                    identifier,
+                    "\", error: ",
+                    error
+                )
+            }),
+            callback_type,
+        ));
     }
 
     /// Changes the currently selected window.
@@ -436,10 +534,15 @@ impl CustomWindowsUtils {
             return;
         }
 
-        let Some(mut window_widgets) = self
+        let window_widgets = self
             .window_widgets
-            .get_mut(&self.current_window_index.load(Ordering::Relaxed))
-        else {
+            .try_get_mut(&self.current_window_index.load(Ordering::Relaxed));
+        if window_widgets.is_locked() {
+            log!("[ERROR] Window widgets is locked, no new widgets can be added to the active window!");
+            return;
+        }
+
+        let Some(mut window_widgets) = window_widgets.try_unwrap() else {
             return;
         };
 
@@ -491,10 +594,15 @@ impl CustomWindowsUtils {
 
     /// Removes a widget from the currently selected custom window.
     pub fn remove_widget(&self, identifier: String) {
-        let Some(mut window_widgets) = self
+        let window_widgets = self
             .window_widgets
-            .get_mut(&self.current_window_index.load(Ordering::Relaxed))
-        else {
+            .try_get_mut(&self.current_window_index.load(Ordering::Relaxed));
+        if window_widgets.is_locked() {
+            log!("[ERROR] Window widgets is locked, no widgets can be removed!");
+            return;
+        }
+
+        let Some(mut window_widgets) = window_widgets.try_unwrap() else {
             return;
         };
 
@@ -511,10 +619,15 @@ impl CustomWindowsUtils {
 
     /// Removes all widgets from the currently selected window.
     pub fn remove_all_widgets(&self) {
-        let Some(mut window_widgets) = self
+        let window_widgets = self
             .window_widgets
-            .get_mut(&self.current_window_index.load(Ordering::Relaxed))
-        else {
+            .try_get_mut(&self.current_window_index.load(Ordering::Relaxed));
+        if window_widgets.is_locked() {
+            log!("[ERROR] Window widgets is locked, no widgets can be removed from the active window!");
+            return;
+        }
+
+        let Some(mut window_widgets) = window_widgets.try_unwrap() else {
             return;
         };
 
@@ -525,7 +638,13 @@ impl CustomWindowsUtils {
     pub fn get_widget(&self, identifier: &str) -> Option<Arc<AtomicRefCell<WidgetType>>> {
         let window_widgets = self
             .window_widgets
-            .get(&self.current_window_index.load(Ordering::Relaxed))?;
+            .try_get(&self.current_window_index.load(Ordering::Relaxed));
+        if window_widgets.is_locked() {
+            log!("[ERROR] Window widgets is locked, no widgets can be pulled from the active window!");
+            return None;
+        }
+
+        let window_widgets = window_widgets.try_unwrap()?;
         for (widget_identifier, widget) in &*window_widgets {
             // If widget was found outside of a `CenteredWidget` widget, return it.
             if widget_identifier == identifier {
@@ -557,6 +676,35 @@ impl CustomWindowsUtils {
         }
 
         None
+    }
+
+    /// Tries to update the text of an existing label.
+    pub fn update_label(&self, identifier: String, new_text: String) {
+        let Some(widget) = self.get_widget(&identifier) else {
+            log!("[ERROR] There are no widgets named \"", identifier, "\"!");
+            return;
+        };
+
+        let widget = widget.try_borrow_mut();
+        if let Err(error) = widget {
+            log!(
+                "[ERROR] Failed mutably borrowing widget \"",
+                identifier,
+                "\", error: ",
+                error
+            );
+            return;
+        }
+
+        let mut widget = widget.unwrap();
+        if let WidgetType::Label(text, _) = &mut *widget {
+            *text = new_text;
+            return;
+        }
+
+        if let WidgetType::LabelCustomFont(text, _) = &mut *widget {
+            *text = new_text;
+        }
     }
 
     /// Attempts to get the value of a f32-slider in the currently-active window.
@@ -693,6 +841,7 @@ impl CustomWindowsUtils {
 
     /// Calls `on_ui_update` on all injected DLLs which use Arctic, and passes in the UI pointer
     /// alongside with the window name so the user can identify each window.
+    #[deprecated = "Will be removed shortly as ImGui support will no longer be a thing in Arctic by default."]
     fn call_ui_event_on_arctic(
         &self,
         ui: &imgui::Ui,

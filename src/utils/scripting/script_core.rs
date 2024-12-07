@@ -242,7 +242,9 @@ impl ScriptCore {
 
         if use_new_thread {
             log!("[Script Engine] Running script on a new thread...");
-            std::thread::spawn(move || code);
+            std::thread::spawn(move || {
+                code();
+            });
             return;
         }
 
