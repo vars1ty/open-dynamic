@@ -1,7 +1,7 @@
 use crate::{
     globals::DELTA_TIME,
     mod_cores::base_core::BaseCore,
-    utils::{eguiutils::ImGuiUtils, extensions::OptionExt, scripting::script_modules::*},
+    utils::{extensions::OptionExt, scripting::script_modules::*},
     winutils::WinUtils,
 };
 use dashmap::DashMap;
@@ -9,7 +9,6 @@ use dll_syringe::{
     process::{BorrowedProcess, OwnedProcess, ProcessModule},
     Syringe,
 };
-use hudhook::imgui::{FontStackToken, Ui};
 use parking_lot::RwLock;
 use rune::Module;
 use std::{
@@ -105,48 +104,6 @@ pub struct DNXFunctions {
 
     /// Gets all of the serials from the config.
     config_get_serials: Box<dyn Fn() -> Arc<Vec<String>> + Send + Sync>,
-
-    // ImGui functions, no explanation needed as they are self-explanatory and documented online.
-    // To be removed in the near future.
-    imgui_text: fn(&Ui, &str),
-    imgui_button: fn(&Ui, &str) -> bool,
-    imgui_button_with_size: fn(&Ui, &str, [f32; 2]) -> bool,
-    imgui_slider_i32: fn(&Ui, &str, i32, i32, &mut i32) -> bool,
-    imgui_slider_u32: fn(&Ui, &str, u32, u32, &mut u32) -> bool,
-    imgui_slider_f32: fn(&Ui, &str, f32, f32, &mut f32) -> bool,
-    imgui_cursor_pos: fn(&Ui) -> [f32; 2],
-    imgui_cursor_screen_pos: fn(&Ui) -> [f32; 2],
-    imgui_set_cursor_pos: fn(&Ui, [f32; 2]),
-    imgui_set_cursor_screen_pos: fn(&Ui, [f32; 2]),
-    imgui_checkbox: fn(&Ui, &str, &mut bool) -> bool,
-    imgui_item_rect_size: fn(&Ui) -> [f32; 2],
-    imgui_item_rect_min: fn(&Ui) -> [f32; 2],
-    imgui_item_rect_max: fn(&Ui) -> [f32; 2],
-    imgui_calc_text_size: fn(&Ui, &str) -> [f32; 2],
-    imgui_group: fn(&Ui, Box<dyn FnOnce()>),
-    imgui_input_text_multiline: fn(&Ui, &str, &mut String, [f32; 2]) -> bool,
-    imgui_input_text: fn(&Ui, &str, &mut String) -> bool,
-    imgui_activate_font_by_rpath:
-        Box<dyn Fn(&Ui, Arc<String>) -> Option<FontStackToken<'_>> + Send + Sync>,
-    imgui_pop_font: fn(&Ui, FontStackToken<'_>),
-    imgui_dummy: fn(&Ui, [f32; 2]),
-    imgui_same_line: fn(&Ui),
-    imgui_window_size: fn(&Ui) -> [f32; 2],
-    imgui_separator: fn(&Ui),
-    imgui_background_add_rect: fn(&Ui, [f32; 2], [f32; 2], f32, bool, [f32; 4]),
-    imgui_window_add_rect: fn(&Ui, [f32; 2], [f32; 2], f32, bool, [f32; 4]),
-    imgui_window_pos: fn(&Ui) -> [f32; 2],
-    imgui_set_next_item_width: fn(&Ui, f32),
-    imgui_columns: fn(&Ui, i32, &str, bool),
-    imgui_next_column: fn(&Ui),
-    imgui_set_column_offset: fn(&Ui, i32, f32),
-    imgui_set_column_width: fn(&Ui, i32, f32),
-    imgui_current_column_index: fn(&Ui) -> i32,
-    imgui_current_column_offset: fn(&Ui) -> f32,
-    imgui_column_width: fn(&Ui, i32) -> f32,
-    imgui_begin_combo: fn(&Ui, &str, &str, Box<dyn FnOnce()>),
-    imgui_selectable: fn(&Ui, &str) -> bool,
-    imgui_set_item_default_focus: fn(&Ui),
 }
 
 /// Arctic is a plugin system for dynamic which is capable of loading user-created DLLs
@@ -172,15 +129,12 @@ impl Arctic {
                     .try_read()
                     .unwrap_or_crash(zencstr!("[ERROR] Failed reading BaseCore!"));
 
-
                 let crosscom_check_is_ex_serial_ok = base_core_reader.get_crosscom();
                 let crosscom_server_aob_scan = base_core_reader.get_crosscom();
                 let crosscom_seerver_get_variable = base_core_reader.get_crosscom();
                 let crosscom_server_get_current_channel = base_core_reader.get_crosscom();
                 let crosscom_server_join_channel = base_core_reader.get_crosscom();
                 let crosscom_server_send_script = base_core_reader.get_crosscom();
-
-                let imgui_utils = base_core_reader.get_imgui_utils();
 
                 let config = base_core_reader.get_config();
                 let serials_sellix_is_paying_for_product = config.get_product_serials();
@@ -290,78 +244,6 @@ impl Arctic {
                         config.save_to_file(relative_path, content)
                     }),
                     config_get_path: Box::new(|| config.get_path()),
-                    imgui_text: |ui, text| ui.text(text),
-                    imgui_button: |ui, text| ui.button(text),
-                    imgui_button_with_size: |ui, text, size| ui.button_with_size(text, size),
-                    imgui_slider_i32: |ui, text, min, max, output| {
-                        slider!(ui, text, min, max, *output)
-                    },
-                    imgui_slider_u32: |ui, text, min, max, output| {
-                        slider!(ui, text, min, max, *output)
-                    },
-                    imgui_slider_f32: |ui, text, min, max, output| {
-                        slider!(ui, text, min, max, *output)
-                    },
-                    imgui_cursor_pos: |ui| ui.cursor_pos(),
-                    imgui_cursor_screen_pos: |ui| ui.cursor_screen_pos(),
-                    imgui_set_cursor_pos: |ui, pos| ui.set_cursor_pos(pos),
-                    imgui_set_cursor_screen_pos: |ui, pos| ui.set_cursor_screen_pos(pos),
-                    imgui_checkbox: |ui, text, output| ui.checkbox(text, output),
-                    imgui_item_rect_size: |ui| ui.item_rect_size(),
-                    imgui_item_rect_min: |ui| ui.item_rect_min(),
-                    imgui_item_rect_max: |ui| ui.item_rect_max(),
-                    imgui_calc_text_size: |ui, text| ui.calc_text_size(text),
-                    imgui_group: |ui, closure| ui.group(closure),
-                    imgui_dummy: |ui, size| ui.dummy(size),
-                    imgui_input_text_multiline: |ui, text, output, size| {
-                        ui.input_text_multiline(text, output, size).build()
-                    },
-                    imgui_input_text: |ui, text, output| ui.input_text(text, output).build(),
-                    imgui_columns: |ui, count, id, border| ui.columns(count, id, border),
-                    imgui_pop_font: |_, font_stack_token| font_stack_token.pop(),
-                    imgui_same_line: |ui| ui.same_line(),
-                    imgui_separator: |ui| ui.separator(),
-                    imgui_window_pos: |ui| ui.window_pos(),
-                    imgui_selectable: |ui, text| ui.selectable(text),
-                    imgui_window_size: |ui| ui.window_size(),
-                    imgui_next_column: |ui| ui.next_column(),
-                    imgui_begin_combo: |ui, text, preview_value, closure| {
-                        let Some(combo) = ui.begin_combo(text, preview_value) else {
-                            return;
-                        };
-
-                        closure();
-                        combo.end();
-                    },
-                    imgui_column_width: |ui, id| ui.column_width(id),
-                    imgui_window_add_rect: |ui, start, end, rounding, filled, color| {
-                        ui.get_window_draw_list()
-                            .add_rect(start, end, color)
-                            .filled(filled)
-                            .rounding(rounding)
-                            .build()
-                    },
-                    imgui_background_add_rect: |ui, start, end, rounding, filled, color| {
-                        ui.get_background_draw_list()
-                            .add_rect(start, end, color)
-                            .filled(filled)
-                            .rounding(rounding)
-                            .build()
-                    },
-                    imgui_set_column_width: |ui, id, width| ui.set_column_width(id, width),
-                    imgui_set_column_offset: |ui, id, offset| ui.set_column_offset(id, offset),
-                    imgui_set_next_item_width: |ui, width| ui.set_next_item_width(width),
-                    imgui_current_column_index: |ui| ui.current_column_index(),
-                    imgui_current_column_offset: |ui| ui.current_column_offset(),
-                    imgui_activate_font_by_rpath: Box::new(move |ui, relative_font_path| {
-                        ImGuiUtils::activate_font(
-                            ui,
-                            imgui_utils
-                                .try_read()?
-                                .get_cfont_from_rpath(Arc::clone(&relative_font_path)),
-                        )
-                    }),
-                    imgui_set_item_default_focus: |ui| ui.set_item_default_focus(),
                     config_get_serials: Box::new(move || Arc::clone(&serials_config_get_serials)),
                 };
 

@@ -66,14 +66,12 @@ impl Default for Config {
                 )
             })];
 
-        let cfg_serials = cached_config_ref[&zencstr!("serials").data]
+        let mut cfg_serials = cached_config_ref[&zencstr!("serials").data]
             .as_array()
             .unwrap_or_else(|| {
                 log!("[WARN] Missing serials string-array, using an empty array!");
                 &default_cfg_serials
-            });
-
-        let mut serials = cfg_serials
+            })
             .to_vec()
             .iter()
             .map(|serial| {
@@ -82,11 +80,11 @@ impl Default for Config {
                     .unwrap_or_crash(zencstr!("[ERROR] ", serial, " is not a valid string!"))
                     .to_owned()
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<String>>();
 
-        if serials.is_empty() {
+        if cfg_serials.is_empty() {
             log!("[WARN] No serials present, using free version!");
-            serials.push(ozencstr!("FREE-ACCESS"));
+            cfg_serials.push(ozencstr!("FREE-ACCESS"));
         }
 
         let detect_deadlocks = cached_config_ref[&zencstr!("detect_deadlocks").data]
@@ -96,7 +94,7 @@ impl Default for Config {
         Self {
             cached_config,
             path: dir_path.leak(),
-            serials: Arc::new(serials),
+            serials: Arc::new(cfg_serials),
             detect_deadlocks,
         }
     }

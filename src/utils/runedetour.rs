@@ -15,11 +15,10 @@ use std::sync::Arc;
 /// called.
 /// Leave as `{}` for no code to be executed.
 macro_rules! generate_detour_id {
-    ($id:literal, $args:expr, $call_once:expr) => {{
+    ($id:literal, $args:expr) => {{
         static CALL_ONCE: Once = Once::new();
         CALL_ONCE.call_once(|| {
             RDetour::register_new_detour($id);
-            $call_once();
         });
 
         let mut collected_args = Vec::with_capacity(10);
@@ -36,7 +35,7 @@ macro_rules! generate_detour_id {
 macro_rules! generate_detour_holder {
     ($fn_name:ident, $id:literal) => {
         unsafe extern "C" fn $fn_name(mut args: ...) -> *const i64 {
-            generate_detour_id!($id, args, {})
+            generate_detour_id!($id, args)
         }
     };
 }
@@ -138,14 +137,14 @@ impl RDetour {
 
         let rune_function = rune_function.unwrap();
         let Some(available_detour) = Self::find_free_detour() else {
-            log!("[ERROR] All detours are busy!");
+            log!("[ERROR] All RDetours are busy!");
             return;
         };
 
         available_detour
             .try_write()
             .unwrap_or_crash(zencstr!(
-                "[ERROR] The found detour is locked and cannot be modified!"
+                "[ERROR] The found RDetour is locked and cannot be modified!"
             ))
             .install_detour(from_ptr, rune_function, opt_param);
     }
@@ -174,7 +173,7 @@ impl RDetour {
     ) {
         if self.is_detour_acquired() {
             log!(
-                "[ERROR] The detour of ID ",
+                "[ERROR] The RDetour of ID ",
                 self.detour_id,
                 " has already been acquired!"
             );
@@ -188,18 +187,23 @@ impl RDetour {
 
         unsafe {
             let hook = Self::create_hook(from_ptr as *const (), to_ptr);
-            hook.enable().unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed enabling detour on ID ",
+            if let Err(error) = hook.enable() {
+                log!(
+                    "[ERROR] Failed enabling RDetour at ID ",
                     self.get_detour_id(),
                     ", error: ",
                     error
-                )
-            });
+                );
+                return;
+            }
             self.detour = Some(hook);
         }
 
-        log!("[RDetour] Hook with ID ", self.get_detour_id(), " enabled!");
+        log!(
+            "[RDetour] RDetour with ID ",
+            self.get_detour_id(),
+            " enabled!"
+        );
     }
 
     /// Calls the associated Rune function on `detour_id`, passing in the original function pointer
@@ -274,7 +278,7 @@ impl RDetour {
             8 => detour_holder_08 as *const (),
             9 => detour_holder_09 as *const (),
             _ => crash!(
-                "[ERROR] RDetour ID ",
+                "[ERROR] RDetour at ID ",
                 self.get_detour_id(),
                 " doesn't have any reserved function for it!"
             ),

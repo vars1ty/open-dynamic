@@ -839,36 +839,6 @@ impl CustomWindowsUtils {
         *self.add_into_centered.borrow_mut() = center_into;
     }
 
-    /// Calls `on_ui_update` on all injected DLLs which use Arctic, and passes in the UI pointer
-    /// alongside with the window name so the user can identify each window.
-    #[deprecated = "Will be removed shortly as ImGui support will no longer be a thing in Arctic by default."]
-    fn call_ui_event_on_arctic(
-        &self,
-        ui: &imgui::Ui,
-        window_name: &str,
-        base_core: Arc<RwLock<BaseCore>>,
-        is_pre: bool,
-    ) {
-        let reader = base_core.try_read();
-        let Some(arctic) = reader
-            .as_ref()
-            .and_then(|reader| reader.get_arctic_core().get())
-        else {
-            return;
-        };
-
-        let injected_dlls = arctic.get_injected_dlls();
-        for module_name in &*injected_dlls {
-            let Some(func) = WinUtils::get_module_symbol_address(&*module_name, c"on_ui_update")
-            else {
-                continue;
-            };
-
-            let func: fn(*const i64, &str, bool) = unsafe { std::mem::transmute(func) };
-            func(std::ptr::addr_of!(ui) as _, window_name, is_pre);
-        }
-    }
-
     /// Retains all widgets that have their identifier present in `identifiers`.
     pub fn retain_widgets_by_identifiers(&self, identifiers: Vec<String>) {
         let Some(mut window_widgets) = self
