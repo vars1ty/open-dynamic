@@ -27,8 +27,7 @@ use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},
 };
-use windows::Win32::Foundation::HANDLE;
-use windows_sys::Win32::System::Threading::GetCurrentProcess;
+use windows::Win32::System::Threading::GetCurrentProcess;
 use wmem::Memory;
 
 /// System modules, like Memory operations and such.
@@ -406,7 +405,7 @@ impl SystemModules {
             return;
         }
 
-        let current_process_handle = HANDLE(unsafe { GetCurrentProcess() } as isize);
+        let current_process_handle = unsafe { GetCurrentProcess() };
 
         // Read one byte from the address just to see if it errors and potentially hinder crashes.
         if let Err(error) =

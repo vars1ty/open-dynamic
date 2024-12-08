@@ -1,21 +1,18 @@
 use crate::mod_cores::base_core::BaseCore;
-use crate::utils::extensions::OptionExt;
-use crate::utils::stringutils::StringUtils;
-use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils};
-use crate::winutils::{POINTWrapper, WinUtils};
+use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, stringutils::StringUtils};
+use crate::winutils::POINTWrapper;
 use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
 use hudhook::imgui::{self, Condition, TextureId};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use rune::alloc::clone::TryClone;
-use rune::runtime::{Function, SyncFunction};
-use rune::Value;
-use std::cell::OnceCell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{cell::Cell, sync::Arc};
+use rune::{alloc::clone::TryClone, runtime::SyncFunction, Value};
+use std::{
+    cell::Cell,
+    rc::Rc,
+    sync::atomic::{AtomicUsize, Ordering},
+    sync::Arc,
+};
 use zstring::ZString;
 
 /// # Safety

@@ -8,17 +8,19 @@ use rune::Any;
 use std::{collections::HashMap, ffi::*, os::windows::prelude::OsStringExt, sync::Arc};
 use windows::{
     core::PCSTR,
-    System::VirtualKey,
     Win32::{
-        Foundation::{HANDLE, MAX_PATH},
-        System::{Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*},
+        Foundation::{MAX_PATH, POINT},
+        Graphics::Gdi::ScreenToClient,
+        System::{
+            Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*, Threading::GetCurrentProcess,
+        },
+        UI::{
+            Input::KeyboardAndMouse::GetAsyncKeyState,
+            WindowsAndMessaging::{
+                GetCursorPos, GetForegroundWindow, MessageBoxA, MESSAGEBOX_STYLE,
+            },
+        },
     },
-};
-use windows_sys::Win32::{
-    Foundation::POINT,
-    Graphics::Gdi::ScreenToClient,
-    System::Threading::GetCurrentProcess,
-    UI::{Input::KeyboardAndMouse::GetAsyncKeyState, WindowsAndMessaging::*},
 };
 use wmem::Memory;
 use zstring::ZString;
@@ -43,76 +45,6 @@ pub enum Renderer {
 
     #[default]
     None,
-}
-
-/// Extension trait for `VirtualKey`.
-pub trait VirtualKeyExt {
-    /// Gets the `VirtualKey` from a string.
-    /// Only a limited set of keys are included.
-    fn from_str(str: &str) -> VirtualKey;
-}
-
-impl VirtualKeyExt for VirtualKey {
-    fn from_str(str: &str) -> VirtualKey {
-        match str {
-            "A" => VirtualKey::A,
-            "B" => VirtualKey::B,
-            "C" => VirtualKey::C,
-            "D" => VirtualKey::D,
-            "E" => VirtualKey::E,
-            "F" => VirtualKey::F,
-            "G" => VirtualKey::G,
-            "H" => VirtualKey::H,
-            "I" => VirtualKey::I,
-            "J" => VirtualKey::J,
-            "K" => VirtualKey::K,
-            "L" => VirtualKey::L,
-            "M" => VirtualKey::M,
-            "N" => VirtualKey::N,
-            "O" => VirtualKey::O,
-            "P" => VirtualKey::P,
-            "Q" => VirtualKey::Q,
-            "R" => VirtualKey::R,
-            "S" => VirtualKey::S,
-            "T" => VirtualKey::T,
-            "U" => VirtualKey::U,
-            "V" => VirtualKey::V,
-            "W" => VirtualKey::W,
-            "X" => VirtualKey::X,
-            "Y" => VirtualKey::Y,
-            "Z" => VirtualKey::Z,
-            "0" => VirtualKey::Number0,
-            "1" => VirtualKey::Number1,
-            "2" => VirtualKey::Number2,
-            "3" => VirtualKey::Number3,
-            "4" => VirtualKey::Number4,
-            "5" => VirtualKey::Number5,
-            "6" => VirtualKey::Number6,
-            "7" => VirtualKey::Number7,
-            "8" => VirtualKey::Number8,
-            "9" => VirtualKey::Number9,
-            "F1" => VirtualKey::F1,
-            "F2" => VirtualKey::F2,
-            "F3" => VirtualKey::F3,
-            "F4" => VirtualKey::F4,
-            "F5" => VirtualKey::F5,
-            "F6" => VirtualKey::F6,
-            "F7" => VirtualKey::F7,
-            "F8" => VirtualKey::F8,
-            "F9" => VirtualKey::F9,
-            "F10" => VirtualKey::F10,
-            "F11" => VirtualKey::F11,
-            "F12" => VirtualKey::F12,
-            "Space" => VirtualKey::Space,
-            "Control" => VirtualKey::Control,
-            "Left" => VirtualKey::Left,
-            "Right" => VirtualKey::Right,
-            "Up" => VirtualKey::Up,
-            "Down" => VirtualKey::Down,
-            "Shift" => VirtualKey::Shift,
-            _ => VirtualKey::None,
-        }
-    }
 }
 
 /// Address types.
@@ -165,7 +97,7 @@ impl WinUtils {
     /// Not a safe function by design, but not marked as unsafe as it does try and ensure some form
     /// of safety.
     pub fn ptr_to_string(ptr: char_ptr) -> Option<&'static str> {
-        Memory::ptr_to_string(&HANDLE(unsafe { GetCurrentProcess() } as isize), ptr)
+        Memory::ptr_to_string(&unsafe { GetCurrentProcess() }, ptr)
     }
 
     /// Gets a module by its non-exact name.
@@ -277,7 +209,12 @@ impl WinUtils {
 
     /// Checks if the given key is being held down.
     pub fn is_key_down(key: &str) -> bool {
-        unsafe { (GetAsyncKeyState(VirtualKey::from_str(key).0) as i32 & 0x8000) != 0 }
+        let Some(vkey) = Self::find_vkey_from_str(key) else {
+            log!("[ERROR] Invalid key: \"", key, "\"!");
+            return false;
+        };
+
+        unsafe { GetAsyncKeyState(vkey & 0x8000) != 0 }
     }
 
     /// Parses a hexadecimal value to its normal primitive value.
@@ -387,7 +324,7 @@ impl WinUtils {
     pub fn get_cursor_pos_recycle(point: &mut POINT) {
         unsafe {
             let cursor_pos = GetCursorPos(point);
-            if cursor_pos == 0 {
+            if cursor_pos.is_err() {
                 log!("[ERROR] Failed to call GetCursorPos, initial value in point remains.");
                 return;
             }
@@ -430,9 +367,9 @@ impl WinUtils {
         unsafe {
             MessageBoxA(
                 GetForegroundWindow(),
-                text_cstr.as_ptr() as _,
-                caption_cstr.as_ptr() as _,
-                message_type,
+                PCSTR(text_cstr.as_ptr() as _),
+                PCSTR(caption_cstr.as_ptr() as _),
+                MESSAGEBOX_STYLE(message_type),
             )
         };
     }
@@ -470,5 +407,47 @@ impl WinUtils {
 
             print!("{message}");
         });
+    }
+
+    /// Tries to find the virtual key code from the string.
+    /// Only a limited set of keys are supported.
+    pub fn find_vkey_from_str(str: &str) -> Option<i32> {
+        if str.len() == 1 {
+            let char = str.chars().next().unwrap_or_crash(zencstr!(
+                "[ERROR] Bad input for WinUtils::find_vkey_from_str!"
+            ));
+            if char.is_ascii_uppercase() || char.is_ascii_digit() {
+                return Some(char as i32);
+            }
+        }
+
+        let key = match str {
+            "F1" => 0x70,
+            "F2" => 0x71,
+            "F3" => 0x72,
+            "F4" => 0x73,
+            "F5" => 0x74,
+            "F6" => 0x75,
+            "F7" => 0x76,
+            "F8" => 0x77,
+            "F9" => 0x78,
+            "F10" => 0x79,
+            "F11" => 0x7A,
+            "F12" => 0x7B,
+            "Space" => 0x20,
+            "Control" => 0x11,
+            "Left" => 0x25,
+            "Right" => 0x27,
+            "Up" => 0x26,
+            "Down" => 0x28,
+            "Shift" => 0x10,
+            _ => 0,
+        };
+
+        if key != 0 {
+            Some(key)
+        } else {
+            None
+        }
     }
 }

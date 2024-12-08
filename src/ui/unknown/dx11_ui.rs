@@ -11,7 +11,7 @@ use hudhook::{
 };
 use parking_lot::RwLock;
 use std::sync::{atomic::Ordering, Arc, OnceLock};
-use windows_sys::Win32::Foundation::POINT;
+use windows::Win32::Foundation::POINT;
 
 /// Simple basic ImGui windows, responsible for also drawing custom windows.
 pub struct DX11UI {

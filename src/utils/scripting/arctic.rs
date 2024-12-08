@@ -15,7 +15,7 @@ use std::{
     os::windows::io::FromRawHandle,
     sync::{atomic::Ordering, Arc, OnceLock},
 };
-use windows_sys::Win32::System::Threading::GetCurrentProcess;
+use windows::Win32::System::Threading::GetCurrentProcess;
 
 /// A structure that contains a set of functions from dynamic.
 #[allow(dead_code)]
@@ -276,7 +276,7 @@ impl Arctic {
             return false;
         }
 
-        let target_process = unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess() as _) };
+        let target_process = unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess().0 as _) };
 
         let payload = Box::leak(Box::new(Syringe::for_process(target_process))).inject(dll_path);
         if let Err(error) = payload {
@@ -301,7 +301,7 @@ impl Arctic {
 
         // Handle function calls from the library.
         func(
-            unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess() as _) },
+            unsafe { OwnedProcess::from_raw_handle(GetCurrentProcess().0 as _) },
             payload,
             Arc::clone(
                 self.cached_functions

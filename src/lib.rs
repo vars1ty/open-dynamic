@@ -28,12 +28,12 @@ use hudhook::{
     hooks::{
         dx11::ImguiDx11Hooks, dx12::ImguiDx12Hooks, dx9::ImguiDx9Hooks, opengl3::ImguiOpenGl3Hooks,
     },
-    windows::Win32::Foundation::HINSTANCE,
+    windows::Win32::{Foundation::HINSTANCE, System::Console::FreeConsole},
     Hudhook,
 };
 use parking_lot::RwLock;
 use std::{ffi::c_void, io::IsTerminal, sync::Arc};
-use windows_sys::Win32::System::Console::{AllocConsole, FreeConsole};
+use windows::Win32::System::Console::AllocConsole;
 use zstring::ZString;
 
 /// Called when the DLL has been injected/detached.
@@ -61,7 +61,7 @@ extern "system" fn DllMain(dll_module: isize, call_reason: u32, reserved: *const
 fn hook(hmodule: isize) {
     // Allocate a console window.
     let is_terminal = std::io::stdout().is_terminal();
-    let allocated = unsafe { AllocConsole() } == 1;
+    let allocated = unsafe { AllocConsole() }.is_ok();
     if allocated || is_terminal {
         println!("{}", include_str!("../resources/ascii"));
         log!("Console Window active, close this window and the process will also close!");
@@ -85,7 +85,9 @@ fn hook(hmodule: isize) {
     // If `free_console` is `true` and there's an allocated console, free the console.
     if allocated {
         if base_core_reader.get_config().get_free_console() {
-            unsafe { FreeConsole() };
+            unsafe {
+                let _ = FreeConsole();
+            }
         } else {
             let base_core_clone = Arc::clone(&base_core);
             std::thread::spawn(move || {
@@ -189,7 +191,7 @@ fn on_console_command(prompt: &str, args: Vec<String>, base_core: Arc<RwLock<Bas
                 "Freeing console in 5 seconds. To get it back again, call the AllocConsole symbol via fn_call or restart the process."
             );
             std::thread::sleep(std::time::Duration::from_secs(5));
-            unsafe { FreeConsole() };
+            let _ = unsafe { FreeConsole() };
         }
         "execute_script" => {
             ZString::default().use_string(|data| {
