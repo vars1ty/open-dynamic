@@ -43,6 +43,10 @@ impl SystemModules {
         global_script_variables: Arc<DashMap<String, ValueWrapper>>,
         thread_keys: Arc<DashMap<String, bool>>,
     ) -> Result<Vec<Module>, ContextError> {
+        let base_core_reader = base_core.read();
+        let config = base_core_reader.get_config();
+        drop(base_core_reader);
+
         let mut module = Module::new();
         let mut dynamic_module = Module::with_crate(&zencstr!("dynamic").data)?;
         let mut compiler_module = Module::with_crate(&zencstr!("Compiler").data)?;
@@ -251,7 +255,27 @@ impl SystemModules {
             .build()?;
 
         std_module
+            .function("write_file", std::fs::write::<String, String>)
+            .build()?;
+
+        std_module
             .function("read_file", std::fs::read_to_string::<String>)
+            .build()?;
+
+        std_module
+            .function("file_exists", |path: String| {
+                std::path::Path::new(&path).is_file()
+            })
+            .build()?;
+
+        std_module
+            .function("dir_exists", |path: String| {
+                std::path::Path::new(&path).is_dir()
+            })
+            .build()?;
+
+        std_module
+            .function("get_current_directory", || config.get_path())
             .build()?;
 
         std_module
