@@ -33,7 +33,7 @@ use hudhook::{
 };
 use parking_lot::RwLock;
 use std::{ffi::c_void, io::IsTerminal, sync::Arc};
-use windows::Win32::System::Console::AllocConsole;
+use windows::Win32::System::Console::{AllocConsole, GetConsoleWindow};
 use zstring::ZString;
 
 /// Called when the DLL has been injected/detached.
@@ -90,14 +90,14 @@ fn hook(hmodule: isize) {
             }
         } else {
             let base_core_clone = Arc::clone(&base_core);
-            std::thread::spawn(move || {
+            std::thread::spawn(move || unsafe {
                 // No freeing the console, we are free to listen for additional commands.
                 let mut prompt = Prompter::new_any_response(
                     "Commands:\n» free_console\n» execute_script [relative_path (String)]\n» exit",
                 );
-                loop {
+                while GetConsoleWindow().0 != 0 {
                     // Can't be None here due to new_any_response, so it's safe to use unchecked.
-                    let result = unsafe { prompt.prompt().unwrap_unchecked() };
+                    let result = prompt.prompt().unwrap_unchecked();
                     on_console_command(
                         &result.prompt.data,
                         result.args,
@@ -171,9 +171,12 @@ fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
                 .get_config()
                 .get_file_content(&ZString::new(startup_rune_script.to_owned()).data, output)
             {
-                crash!(
-                "[ERROR] Failed reading startup Rune file, ensure the relative path is correct!"
-            );
+                log!(
+                    "[WARN] Failed reading startup Rune file \"",
+                    startup_rune_script,
+                    "\", ensure the relative path is correct!"
+                );
+                return;
             }
 
             base_core_reader.get_script_core().execute(
