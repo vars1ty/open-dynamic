@@ -207,6 +207,7 @@ impl Config {
         let defined = self.get()[&zencstr!("renderer_target").data]
             .as_str()
             .unwrap_or({
+                // FIXME: returns this no matter what.
                 log!("[WARN] No renderer_target defined, using None.");
                 "None"
             });
@@ -266,9 +267,24 @@ impl Config {
         fonts
     }
 
-    /// Gets the startup Rune script to execute, if any.
-    pub fn get_startup_rune_script(&self) -> Option<&str> {
-        self.get()[&zencstr!("startup_rune_script").data].as_str()
+    /// Gets the startup Rune scripts to execute, if any.
+    pub fn get_startup_rune_scripts(&self) -> Option<Vec<String>> {
+        Some(
+            self.get()[&zencstr!("startup_rune_scripts").data]
+                .as_array()?
+                .iter()
+                .map(|entry| {
+                    entry
+                        .as_str()
+                        .unwrap_or_crash(zencstr!(
+                            "[ERROR] Startup Rune script \"",
+                            entry,
+                            "\" is not a valid string!"
+                        ))
+                        .to_string()
+                })
+                .collect(),
+        )
     }
 
     /// If `true`, Rune will use a new thread to execute the `main` function.

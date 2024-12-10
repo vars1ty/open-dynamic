@@ -160,27 +160,30 @@ fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
         drop(builder);
     }
 
-    let Some(startup_rune_script) = base_core_reader.get_config().get_startup_rune_script() else {
+    let Some(startup_rune_scripts) = base_core_reader.get_config().get_startup_rune_scripts()
+    else {
         return;
     };
 
-    ZString::default().use_string(|output| {
-        if !base_core_reader
-            .get_config()
-            .get_file_content(&ZString::new(startup_rune_script.to_owned()).data, output)
-        {
-            crash!(
+    for startup_rune_script in startup_rune_scripts {
+        ZString::default().use_string(|output| {
+            if !base_core_reader
+                .get_config()
+                .get_file_content(&ZString::new(startup_rune_script.to_owned()).data, output)
+            {
+                crash!(
                 "[ERROR] Failed reading startup Rune file, ensure the relative path is correct!"
             );
-        }
+            }
 
-        base_core_reader.get_script_core().execute(
-            std::mem::take(output),
-            Arc::clone(&base_core),
-            false,
-            false,
-        );
-    });
+            base_core_reader.get_script_core().execute(
+                std::mem::take(output),
+                Arc::clone(&base_core),
+                false,
+                false,
+            );
+        });
+    }
 }
 
 /// Called when a console command should be looked up and executed, after everything's initialized.
