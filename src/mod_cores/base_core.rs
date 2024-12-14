@@ -10,9 +10,8 @@ use crate::utils::{
     stringutils::StringUtils,
     ui::customwindows::CustomWindowsUtils,
 };
-use parking_lot::{Once, RwLock};
+use parking_lot::RwLock;
 use std::sync::{Arc, LazyLock, OnceLock};
-use zstring::ZString;
 
 /// A base core structure which holds a handle to the current process, and an instance to `Config`.
 pub struct BaseCore {
@@ -140,49 +139,6 @@ impl BaseCore {
                 crash!("[ERROR] Failed connecting to the server, perhaps your serial is incorrect, or the server is down?");
             }
         }
-    }
-
-    /// Tries starting `parking_lot`'s experimental deadlock detection.
-    /// This also uses a static `Once` instance, ensuring that if it is somehow called twice, it
-    /// won't execute the main logic more than once.
-    /// If `detect_deadlocks` in the config is `false`, then this will do nothing.
-    pub fn try_start_deadlock_detection(&self) {
-        if !self.get_config().get_detect_deadlocks() {
-            return;
-        }
-
-        static START_ONCE: Once = Once::new();
-        START_ONCE.call_once(|| {
-            std::thread::spawn(move || loop {
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                let deadlocks = parking_lot::deadlock::check_deadlock();
-                if deadlocks.is_empty() {
-                    continue;
-                }
-
-                let mut crash_log = ZString::default();
-                for (i, threads) in deadlocks.iter().enumerate() {
-                    log!("[ERROR] Deadlock detected, report it to #assistance!", i);
-                    for thread in threads {
-                        crash_log.push_zstring(zencstr!(
-                            "Deadlock ID: ",
-                            i,
-                            "\nThread ID: ",
-                            format!("{:#?}\n", thread.thread_id()),
-                            "Backtrace: ",
-                            format!("{:#?}\n", thread.backtrace())
-                        ));
-                    }
-                }
-
-                drop(deadlocks);
-                crash!(
-                    "[ERROR] Deadlock detected, crash log to forward:\n",
-                    crash_log,
-                    "\ndynamic will close as it isn't deemed safe to continue running."
-                );
-            });
-        });
     }
 
     /// Returns the cached config instance.

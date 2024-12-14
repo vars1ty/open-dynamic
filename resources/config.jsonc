@@ -5,11 +5,6 @@
     // Default Value: OpenGL
     "renderer_target": "OpenGL",
 
-    // Should dynamic try and look for deadlocks every 2s?
-    // Crashing with a log if one is detected.
-    // Default Value: true
-    "detect_deadlocks": true,
-
     /// Header Font Size, by default its 26.
     "header_font_size": 26,
 

@@ -21,9 +21,6 @@ pub struct Config {
 
     /// Custom product serials.
     serials: Arc<Vec<String>>,
-
-    /// Whether or not deadlocks should be checked for.
-    detect_deadlocks: bool,
 }
 
 thread_safe_structs!(Config);
@@ -87,15 +84,10 @@ impl Default for Config {
             cfg_serials.push(ozencstr!("FREE-ACCESS"));
         }
 
-        let detect_deadlocks = cached_config_ref[&zencstr!("detect_deadlocks").data]
-            .as_bool()
-            .unwrap_or(true);
-
         Self {
             cached_config,
             path: dir_path.leak(),
             serials: Arc::new(cfg_serials),
-            detect_deadlocks,
         }
     }
 }
@@ -293,10 +285,5 @@ impl Config {
         self.get()[&zencstr!("use_new_rune_thread").data]
             .as_bool()
             .unwrap_or(true)
-    }
-
-    /// Whether or not deadlocks should be checked for.
-    pub const fn get_detect_deadlocks(&self) -> bool {
-        self.detect_deadlocks
     }
 }

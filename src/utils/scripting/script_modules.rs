@@ -17,7 +17,6 @@ use crate::{
     winutils::{AddressType, WinUtils},
 };
 use dashmap::DashMap;
-use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rune::{alloc::clone::TryClone, runtime::Function, ContextError, Module, Value};
 use std::{
