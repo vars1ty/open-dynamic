@@ -15,7 +15,7 @@ use windows::{
             Diagnostics::ToolHelp::MODULEENTRY32, LibraryLoader::*, Threading::GetCurrentProcess,
         },
         UI::{
-            Input::KeyboardAndMouse::GetAsyncKeyState,
+            Input::KeyboardAndMouse::GetKeyState,
             WindowsAndMessaging::{
                 GetCursorPos, GetForegroundWindow, MessageBoxA, MESSAGEBOX_STYLE,
             },
@@ -214,7 +214,7 @@ impl WinUtils {
             return false;
         };
 
-        unsafe { GetAsyncKeyState(vkey & 0x8000) != 0 }
+        unsafe { GetKeyState(vkey) < 0 }
     }
 
     /// Parses a hexadecimal value to its normal primitive value.
