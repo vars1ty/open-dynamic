@@ -1,9 +1,10 @@
 use crate::mod_cores::base_core::BaseCore;
+use crate::utils::dynwidget::SubWidgetType;
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, stringutils::StringUtils};
 use crate::winutils::POINTWrapper;
 use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
-use hudhook::imgui::{self, Condition, TextureId};
+use hudhook::imgui::{self, Condition, TextureId, TreeNodeFlags};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{alloc::clone::TryClone, runtime::SyncFunction, Value};
@@ -59,9 +60,10 @@ pub struct CustomWindowsUtils {
     /// Widgets that should remain hidden.
     hidden_widgets: Mutex<Vec<String>>,
 
-    /// If `Some(String)`, all widgets that get added next will be added into the defined centered
-    /// widget parent/holder.
-    add_into_centered: AtomicRefCell<Option<String>>,
+    /// If `Some()`, then adding a new widget will result in it getting added to the defined
+    /// sub-widget if present.
+    /// If `None`, then it's added onto the UI as-is.
+    add_into_sub_widget: AtomicRefCell<Option<String>>,
 
     /// Pending scripts to be executed on the next UI draw call.
     pending_scripts: AtomicRefCell<Option<Vec<String>>>,
@@ -89,8 +91,6 @@ impl CustomWindowsUtils {
             return;
         };
 
-        // Execute the script.
-        // CrossCom disabled for now when it comes to buttons, might be changed in the future.
         existing_pending_scripts.push(rune_code);
     }
 
@@ -280,11 +280,6 @@ impl CustomWindowsUtils {
                     );
                 };
             }
-            WidgetType::LegacyButton(text, rune_code) => {
-                if button!(ui, text) && !rune_code.is_empty() {
-                    self.execute_rune_code(rune_code);
-                }
-            }
             WidgetType::Spacing(x, y) => ui.dummy([*x, *y]),
             WidgetType::Separator => ui.separator(),
             WidgetType::F32Slider(text, min, max, current_value, callback, opt_param) => {
@@ -350,7 +345,7 @@ impl CustomWindowsUtils {
                     self.execute_rune_code(rune_code);
                 }
             }
-            WidgetType::CenteredWidgets(widgets, custom_y, group_size) => {
+            /*WidgetType::CenteredWidgets(widgets, custom_y, group_size) => {
                 let new_group_size = ImGuiUtils::draw_centered_widgets(
                     ui,
                     ui.window_size(),
@@ -373,10 +368,36 @@ impl CustomWindowsUtils {
                 );
 
                 *group_size = new_group_size;
-            }
+            }*/
             WidgetType::InputTextMultiLine(label, text_input, width, height) => {
                 ui.input_text_multiline(label, text_input, [*width, *height])
                     .build();
+            }
+            WidgetType::SubWidget(sub_widget, widgets, ..) => {
+                self.handle_sub_widget(ui, Arc::clone(&base_core), sub_widget, widgets);
+            }
+        }
+    }
+
+    /// Handles the logic of a sub-widget.
+    fn handle_sub_widget(
+        &self,
+        ui: &imgui::Ui,
+        base_core: Arc<RwLock<BaseCore>>,
+        sub_widget: &mut SubWidgetType,
+        widgets: &WidgetsMap,
+    ) {
+        match sub_widget {
+            SubWidgetType::CenteredWidgets(_, _) => {}
+            SubWidgetType::CollapsingHeader(text) => {
+                if !ui.collapsing_header(text, TreeNodeFlags::OPEN_ON_ARROW) {
+                    return;
+                }
+
+                // TODO: hidden_widgets check
+                for (identifier, widget) in widgets {
+                    self.handle_widget(Arc::clone(&base_core), ui, identifier, widget);
+                }
             }
         }
     }
@@ -524,13 +545,6 @@ impl CustomWindowsUtils {
             identifier = StringUtils::get_random();
         }
 
-        // If auto-center is enabled and assuming the identifier for it isn't empty, center the
-        // widget.
-        if let Some(parent_identifier) = self.add_into_centered.borrow().as_ref() {
-            self.add_into_centered_widget(parent_identifier, identifier, widget_type);
-            return;
-        }
-
         let window_widgets = self
             .window_widgets
             .try_get_mut(&self.current_window_index.load(Ordering::Relaxed));
@@ -543,50 +557,95 @@ impl CustomWindowsUtils {
             return;
         };
 
-        #[allow(clippy::arc_with_non_send_sync)]
-        window_widgets.insert(identifier, Arc::new(AtomicRefCell::new(widget_type)));
-    }
-
-    /// Adds a widget to a centered widget holder/parent.
-    pub fn add_into_centered_widget(
-        &self,
-        parent_identifier: &str,
-        identifier: String,
-        widget_type: WidgetType,
-    ) {
-        for entry in &self.window_widgets {
-            let widget_map = entry.value();
-            let Some(entry) = widget_map
-                .iter()
-                .find(|(identifier, _)| *identifier == parent_identifier)
-            else {
-                continue;
-            };
-
-            let Ok(mut widget) = entry.1.try_borrow_mut() else {
-                log!(
-                    "[ERROR] Cannot borrow widget \"",
-                    identifier,
-                    "\" as mutable, cancelling!"
-                );
-                return;
-            };
-
-            let WidgetType::CenteredWidgets(widgets, _custom_y, _group_size) = &mut *widget else {
-                continue;
-            };
-
-            // Check if the user is trying to nest centered widgets together.
-            // If attempted, don't continue.
-            if let WidgetType::CenteredWidgets(..) = widget_type {
-                log!("[ERROR] Nesting centered group widgets isn't supported!");
-                return;
-            }
-
-            #[allow(clippy::arc_with_non_send_sync)]
-            widgets.insert(identifier, Arc::new(AtomicRefCell::new(widget_type)));
+        if let Some(parent_identifier) = self.add_into_sub_widget.borrow().as_ref() {
+            self.add_into_sub_widget(
+                &mut window_widgets,
+                parent_identifier,
+                identifier,
+                widget_type,
+            );
             return;
         }
+
+        let sub_widget_data =
+            if let WidgetType::SubWidget(_, _, ref call_once, ref opt_param) = widget_type {
+                Some((Rc::clone(call_once), Rc::clone(opt_param)))
+            } else {
+                None
+            };
+
+        #[allow(clippy::arc_with_non_send_sync)]
+        let widget = Arc::new(AtomicRefCell::new(widget_type));
+        window_widgets.insert(identifier.to_owned(), Arc::clone(&widget));
+        drop(window_widgets);
+
+        // If the added widget was a sub-widget, call the function attached.
+        let Some((sub_widget_call_once, opt_param)) = sub_widget_data else {
+            return;
+        };
+
+        self.set_sub_widget_identifier(Some(identifier.to_owned()));
+        let Err(error) = sub_widget_call_once
+            .call::<(Option<&Value>,), ()>((opt_param.as_ref().as_ref(),))
+            .into_result()
+        else {
+            self.set_sub_widget_identifier(None);
+            return;
+        };
+
+        log!(
+            "[ERROR] Failed calling function on sub-widget \"",
+            identifier,
+            "\", error: ",
+            error
+        );
+        self.set_sub_widget_identifier(None);
+    }
+
+    /// Adds `widget_type` into the sub-widget found by `sub_widget_identifier` if found.
+    fn add_into_sub_widget(
+        &self,
+        widgets: &mut WidgetsMap,
+        sub_widget_identifier: &str,
+        mut identifier: String,
+        widget_type: WidgetType,
+    ) {
+        if identifier.is_empty() {
+            // Empty identifier, use a "random" string.
+            // Identifier should really be an Option<String>, but that's reserved for the future if
+            // anything due to compatibility reasons.
+            identifier = StringUtils::get_random();
+        }
+
+        let Some(sub_widget) = widgets
+            .iter()
+            .find(|(identifier, _)| *identifier == sub_widget_identifier)
+            .map(|(_, widget)| widget)
+        else {
+            log!("[ERROR] No widgets named \"", sub_widget_identifier, "\"!");
+            return;
+        };
+
+        let Ok(mut sub_widget) = sub_widget.try_borrow_mut() else {
+            log!(
+                "[ERROR] Failed borrowing \"",
+                sub_widget_identifier,
+                "\" as mutable as it's currently busy, cannot add into sub-widget!"
+            );
+            return;
+        };
+
+        let WidgetType::SubWidget(_, widgets, ..) = &mut *sub_widget else {
+            log!(
+                "[ERROR] Widget \"",
+                sub_widget_identifier,
+                "\" is not a sub-widget, cannot add widget!"
+            );
+            return;
+        };
+
+        #[allow(clippy::arc_with_non_send_sync)]
+        widgets.insert(identifier, Arc::new(AtomicRefCell::new(widget_type)));
     }
 
     /// Removes a widget from the currently selected custom window.
@@ -605,10 +664,9 @@ impl CustomWindowsUtils {
 
         window_widgets.shift_remove(&identifier);
 
-        // Search through all widgets for all CenteredWidgets, then try and remove all instances of
-        // `identifier`.
+        // Iterate over sub-widgets and remove any potential matches.
         for (_, widget) in &*window_widgets {
-            if let WidgetType::CenteredWidgets(widgets, _, _) = &mut *widget.borrow_mut() {
+            if let WidgetType::SubWidget(_, widgets, ..) = &mut *widget.borrow_mut() {
                 widgets.shift_remove(&identifier);
             }
         }
@@ -661,7 +719,7 @@ impl CustomWindowsUtils {
             // it. If found, return it.
             // This won't work with nested CenteredWidgets, but that's frowned upon and
             // shouldn't be accounted for regardless.
-            let WidgetType::CenteredWidgets(widgets, _, _) = &*widget else {
+            let WidgetType::SubWidget(_, widgets, ..) = &*widget else {
                 continue;
             };
 
@@ -676,6 +734,7 @@ impl CustomWindowsUtils {
     }
 
     /// Tries to update the text of an existing label.
+    /// TODO: Make work on any widget with a label.
     pub fn update_label(&self, identifier: String, new_text: String) {
         let Some(widget) = self.get_widget(&identifier) else {
             log!("[ERROR] There are no widgets named \"", identifier, "\"!");
@@ -830,10 +889,10 @@ impl CustomWindowsUtils {
         }
     }
 
-    /// Makes all upcoming widgets be centered into the defined centered widget parent/holder.
-    /// If `None`, they are no longer centered automatically.
-    pub fn set_widget_auto_centered_into(&self, center_into: Option<String>) {
-        *self.add_into_centered.borrow_mut() = center_into;
+    /// Sets the name of the sub-widget to be used for adding all upcoming widgets, until set to
+    /// `None` again.
+    pub fn set_sub_widget_identifier(&self, focus: Option<String>) {
+        *self.add_into_sub_widget.borrow_mut() = focus;
     }
 
     /// Retains all widgets that have their identifier present in `identifiers`.

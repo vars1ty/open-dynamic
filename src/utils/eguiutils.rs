@@ -165,7 +165,7 @@ impl ImGuiUtils {
         // Tab
         colors[ImGuiCol_Tab as usize] = RED_HINT;
         colors[ImGuiCol_TabHovered as usize] = RED_ALMOST_FULL;
-        colors[ImGuiCol_TabActive as usize] = RED_FULL;
+        // colors[ImGuiCol_TabActive as usize] = RED_FULL; ??
 
         // Checkmark
         colors[ImGuiCol_CheckMark as usize] = RED_HINT;
@@ -397,7 +397,7 @@ impl ImGuiUtils {
     /// **Note**: This should be called every frame and will **only** sync the clipboard if CTRL+V
     /// has been pressed.
     pub fn sync_clipboard(ui: &imgui::Ui) {
-        if !ui.io().keys_down[imgui::Key::V as usize] || !ui.io().key_ctrl {
+        if !ui.is_key_down(Key::V) || !ui.io().key_ctrl {
             return;
         }
 

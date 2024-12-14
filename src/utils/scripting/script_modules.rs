@@ -7,7 +7,7 @@ use crate::{
     mod_cores::base_core::BaseCore,
     utils::{
         crosscom::CrossCom,
-        dynwidget::WidgetType,
+        dynwidget::{SubWidgetType, WidgetType},
         extensions::{F32Ext, OptionExt},
         runedetour::RDetour,
         scripting::rune_ext_structs::RuneDoubleResultPrimitive,
@@ -704,14 +704,6 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_legacy_button", |identifier, text, rune_code| {
-                log!("[WARN] Legacy buttons will be removed in the future!");
-                custom_window_utils
-                    .add_widget(identifier, WidgetType::LegacyButton(text, rune_code))
-            })
-            .build()?;
-
-        module
             .function("add_separator", |identifier| {
                 custom_window_utils.add_widget(identifier, WidgetType::Separator)
             })
@@ -881,21 +873,6 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_centered_widget_group", |identifier, custom_y| {
-                custom_window_utils.add_widget(
-                    identifier,
-                    WidgetType::CenteredWidgets(IndexMap::new(), custom_y, [0.0, 0.0]),
-                )
-            })
-            .build()?;
-
-        module
-            .function("set_auto_center_into", |identifier| {
-                custom_window_utils.set_widget_auto_centered_into(identifier)
-            })
-            .build()?;
-
-        module
             .function(
                 "add_input_text_multiline",
                 |identifier, label, width, height| {
@@ -931,6 +908,50 @@ impl UIModules {
             })
             .build()?;
 
+        module
+            .function(
+                "add_collapsing_section",
+                move |section_identifier: String,
+                      text,
+                      call_once: Function,
+                      opt_param: Option<Value>| {
+                    Self::add_sub_widget(
+                        section_identifier,
+                        SubWidgetType::CollapsingHeader(text),
+                        call_once,
+                        opt_param,
+                        custom_window_utils,
+                    );
+                },
+            )
+            .build()?;
+
         Ok(module)
+    }
+
+    /// Helper function for making it easier to add sub-widgets.
+    fn add_sub_widget(
+        section_identifier: String,
+        sub_widget_type: SubWidgetType,
+        call_once: Function,
+        opt_param: Option<Value>,
+        custom_window_utils: &'static CustomWindowsUtils,
+    ) {
+        custom_window_utils.add_widget(
+            section_identifier.to_owned(),
+            WidgetType::SubWidget(
+                sub_widget_type,
+                Default::default(),
+                Rc::new(call_once.into_sync().into_result().unwrap_or_else(|error| {
+                    crash!(
+                        "[ERROR Failed turning Function into SyncFunction at \"",
+                        section_identifier,
+                        "\", error: ",
+                        error
+                    )
+                })),
+                Rc::new(opt_param),
+            ),
+        )
     }
 }

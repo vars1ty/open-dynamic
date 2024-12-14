@@ -25,7 +25,7 @@ magic-crypt = "3.1.13"
 atomic_float = "1.1.0"
 message-io = "0.18.1"
 indexmap = "2.6.0"
-hudhook = "0.8.0"
+hudhook = { path = "/home/stackalloc/Git/hudhook"}
 dashmap = "6.1.0"
 obfstr = "0.4.4"
 ahash = "0.8.11"
