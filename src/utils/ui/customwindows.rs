@@ -387,6 +387,14 @@ impl CustomWindowsUtils {
         sub_widget: &mut SubWidgetType,
         widgets: &WidgetsMap,
     ) {
+        let Some(hidden_widgets) = self.hidden_widgets.try_lock() else {
+            log!("[ERROR] Hidden widgets is locked, cannot render sub-widget!");
+            return;
+        };
+
+        let widgets = widgets
+            .iter()
+            .filter(|(identifier, _)| !hidden_widgets.contains(identifier));
         match sub_widget {
             SubWidgetType::CenteredWidgets(_, _) => {}
             SubWidgetType::CollapsingHeader(text) => {
@@ -394,7 +402,6 @@ impl CustomWindowsUtils {
                     return;
                 }
 
-                // TODO: hidden_widgets check
                 for (identifier, widget) in widgets {
                     self.handle_widget(Arc::clone(&base_core), ui, identifier, widget);
                 }

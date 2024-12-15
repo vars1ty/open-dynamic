@@ -198,8 +198,7 @@ impl Config {
     pub fn get_renderer_target(&self) -> Renderer {
         let defined = self.get()[&zencstr!("renderer_target").data]
             .as_str()
-            .unwrap_or({
-                // FIXME: returns this no matter what.
+            .unwrap_or_else(|| {
                 log!("[WARN] No renderer_target defined, using None.");
                 "None"
             });
