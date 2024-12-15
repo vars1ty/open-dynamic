@@ -25,16 +25,6 @@ use windows::{
 use wmem::Memory;
 use zstring::ZString;
 
-/// Wrapper around `POINT` which implements `Default`.
-#[derive(Clone, Copy)]
-pub struct POINTWrapper(pub POINT);
-
-impl Default for POINTWrapper {
-    fn default() -> Self {
-        Self(POINT { x: 0, y: 0 })
-    }
-}
-
 /// Renderer enum for determing the render target for an unsupported game.
 #[derive(Debug, Default)]
 pub enum Renderer {

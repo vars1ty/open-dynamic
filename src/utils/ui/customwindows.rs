@@ -1,7 +1,6 @@
 use crate::mod_cores::base_core::BaseCore;
 use crate::utils::dynwidget::SubWidgetType;
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, stringutils::StringUtils};
-use crate::winutils::POINTWrapper;
 use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
 use hudhook::imgui::{self, Condition, TextureId, TreeNodeFlags};
@@ -14,6 +13,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
 };
+use windows::Win32::Foundation::POINT;
 use zstring::ZString;
 
 /// # Safety
@@ -31,6 +31,7 @@ enum CallbackType {
     Button(String, Rc<Option<Value>>),
     I32Slider(String, i32, Rc<Option<Value>>),
     F32Slider(String, f32, Rc<Option<Value>>),
+    Checkbox(String, bool, Rc<Option<Value>>),
 }
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
@@ -55,10 +56,10 @@ pub struct CustomWindowsUtils {
 
     /// Current cursor point.
     /// Allowed to be non-thread-safe as it doesn't matter.
-    point: Cell<POINTWrapper>,
+    point: Cell<POINT>,
 
     /// Widgets that should remain hidden.
-    hidden_widgets: Mutex<Vec<String>>,
+    hidden_widgets: AtomicRefCell<Vec<String>>,
 
     /// If `Some()`, then adding a new widget will result in it getting added to the defined
     /// sub-widget if present.
@@ -131,7 +132,7 @@ impl CustomWindowsUtils {
                 .collapsed(true, Condition::Once)
                 .build(|| {
                     self.draw_custom_window(Arc::clone(&base_core), &widgets, ui);
-                    ImGuiUtils::render_software_cursor(ui, &mut self.point.get().0);
+                    ImGuiUtils::render_software_cursor(ui, &mut self.point.get());
                 });
         }
 
@@ -192,6 +193,19 @@ impl CustomWindowsUtils {
                         );
                     }
                 }
+                CallbackType::Checkbox(identifier, checked, opt_param) => {
+                    if let Err(error) = callback
+                        .call::<(bool, Option<&Value>), ()>((*checked, opt_param.as_ref().as_ref()))
+                        .into_result()
+                    {
+                        log!(
+                            "[ERROR] Failed calling checkbox function on \"",
+                            identifier,
+                            "\", error: ",
+                            error
+                        );
+                    }
+                }
                 _ => crash!("[ERROR] Invalid callback type!"),
             }
         }
@@ -207,7 +221,7 @@ impl CustomWindowsUtils {
         ui: &imgui::Ui,
     ) {
         for (identifier, widget) in widgets {
-            let Some(hidden_widgets) = self.hidden_widgets.try_lock() else {
+            let Ok(hidden_widgets) = self.hidden_widgets.try_borrow() else {
                 continue;
             };
 
@@ -376,6 +390,19 @@ impl CustomWindowsUtils {
             WidgetType::SubWidget(sub_widget, widgets, ..) => {
                 self.handle_sub_widget(ui, Arc::clone(&base_core), sub_widget, widgets);
             }
+            WidgetType::Checkbox(text, checked, callback, opt_param) => {
+                if ui.checkbox(text, checked) {
+                    self.add_callback(
+                        identifier,
+                        callback,
+                        CallbackType::Checkbox(
+                            identifier.to_owned(),
+                            *checked,
+                            Rc::clone(opt_param),
+                        ),
+                    );
+                }
+            }
         }
     }
 
@@ -387,8 +414,8 @@ impl CustomWindowsUtils {
         sub_widget: &mut SubWidgetType,
         widgets: &WidgetsMap,
     ) {
-        let Some(hidden_widgets) = self.hidden_widgets.try_lock() else {
-            log!("[ERROR] Hidden widgets is locked, cannot render sub-widget!");
+        let Ok(hidden_widgets) = self.hidden_widgets.try_borrow() else {
+            log!("[ERROR] Hidden widgets is busy, cannot render sub-widget!");
             return;
         };
 
@@ -874,7 +901,8 @@ impl CustomWindowsUtils {
 
     /// Hides a set of widgets by their identifiers from all windows.
     pub fn hide_widgets(&self, identifiers: Vec<String>) {
-        let Some(mut hidden_widgets) = self.hidden_widgets.try_lock() else {
+        let Ok(mut hidden_widgets) = self.hidden_widgets.try_borrow_mut() else {
+            log!("[ERROR] Hidden widgets is already being borrowed, cannot insert new ones at this time!");
             return;
         };
 
@@ -887,7 +915,8 @@ impl CustomWindowsUtils {
 
     /// If the defined widgets are hidden, they'll then be shown again.
     pub fn show_widgets(&self, identifiers: Vec<String>) {
-        let Some(mut hidden_widgets) = self.hidden_widgets.try_lock() else {
+        let Ok(mut hidden_widgets) = self.hidden_widgets.try_borrow_mut() else {
+            log!("[ERROR] Hidden widgets is already being borrowed, cannot remove existing ones at this time!");
             return;
         };
 

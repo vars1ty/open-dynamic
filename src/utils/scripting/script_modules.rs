@@ -18,7 +18,11 @@ use crate::{
 };
 use dashmap::DashMap;
 use parking_lot::RwLock;
-use rune::{alloc::clone::TryClone, runtime::Function, ContextError, Module, Value};
+use rune::{
+    alloc::clone::TryClone,
+    runtime::{Function, SyncFunction},
+    ContextError, Module, Value,
+};
 use std::{
     ffi::CString,
     fmt::{Debug, Display},
@@ -925,7 +929,40 @@ impl UIModules {
             )
             .build()?;
 
+        module
+            .function(
+                "add_checkbox",
+                |identifier: String,
+                 text,
+                 checked,
+                 on_value_changed: Function,
+                 opt_param: Option<Value>| {
+                    custom_window_utils.add_widget(
+                        identifier.to_owned(),
+                        WidgetType::Checkbox(
+                            text,
+                            checked,
+                            Rc::new(Self::function_into_sync(on_value_changed, identifier)),
+                            Rc::new(opt_param),
+                        ),
+                    )
+                },
+            )
+            .build()?;
+
         Ok(module)
+    }
+
+    /// Turns `Function` into a `SyncFunction`, crashing if it fails.
+    fn function_into_sync(function: Function, identifier: String) -> SyncFunction {
+        function.into_sync().into_result().unwrap_or_else(|error| {
+            crash!(
+                "[ERROR Failed turning Function into SyncFunction at \"",
+                identifier,
+                "\", error: ",
+                error
+            )
+        })
     }
 
     /// Helper function for making it easier to add sub-widgets.
@@ -941,14 +978,7 @@ impl UIModules {
             WidgetType::SubWidget(
                 sub_widget_type,
                 Default::default(),
-                Rc::new(call_once.into_sync().into_result().unwrap_or_else(|error| {
-                    crash!(
-                        "[ERROR Failed turning Function into SyncFunction at \"",
-                        section_identifier,
-                        "\", error: ",
-                        error
-                    )
-                })),
+                Rc::new(Self::function_into_sync(call_once, section_identifier)),
                 Rc::new(opt_param),
             ),
         )

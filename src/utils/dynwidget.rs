@@ -25,6 +25,8 @@ pub enum WidgetType {
         Rc<SyncFunction>,
         Rc<Option<Value>>,
     ),
+
+    Checkbox(String, bool, Rc<SyncFunction>, Rc<Option<Value>>),
 }
 
 /// Sub-widget type, aka types like collapsing headers and alike.
