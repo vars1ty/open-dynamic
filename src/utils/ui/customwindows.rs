@@ -67,9 +67,6 @@ pub struct CustomWindowsUtils {
     /// If `None`, then it's added onto the UI as-is.
     add_into_sub_widget: AtomicRefCell<Option<String>>,
 
-    /// Pending scripts to be executed on the next UI draw call.
-    pending_scripts: AtomicRefCell<Option<Vec<String>>>,
-
     /// Pending callbacks for buttons and sliders, as executing them at the same frame in the UI
     /// can cause deadlocks.
     /// No `*Map` because it requires traits which aren't implemented for `*Function` in order to
@@ -80,22 +77,6 @@ pub struct CustomWindowsUtils {
 thread_safe_structs!(CustomWindowsUtils);
 
 impl CustomWindowsUtils {
-    /// Executes Rune code, intended for custom windows.
-    fn execute_rune_code(&self, rune_code: &str) {
-        let Ok(mut pending_scripts) = self.pending_scripts.try_borrow_mut() else {
-            log!("[ERROR] pending_scripts cannot be borrowed as mutable, cancelling script execution.");
-            return;
-        };
-
-        let rune_code = rune_code.to_owned();
-        let Some(existing_pending_scripts) = pending_scripts.as_mut() else {
-            *pending_scripts = Some(vec![rune_code]);
-            return;
-        };
-
-        existing_pending_scripts.push(rune_code);
-    }
-
     /// Draws all of the custom windows.
     pub fn draw_custom_windows(&self, ui: &imgui::Ui, base_core: Arc<RwLock<BaseCore>>) {
         let Some(window_titles) = self.window_titles.try_read() else {
@@ -341,7 +322,15 @@ impl CustomWindowsUtils {
             }
             WidgetType::NextWidgetWidth(width) => ui.set_next_item_width(*width),
             WidgetType::SameLine => ui.same_line(),
-            WidgetType::Image(image_path, width, height, overlay, background, rune_code) => {
+            WidgetType::Image(
+                image_path,
+                width,
+                height,
+                overlay,
+                background,
+                callback,
+                opt_param,
+            ) => {
                 let Some(texture_id) =
                     self.get_texture_id(image_path, base_core.read().get_config().get_path())
                 else {
@@ -373,7 +362,11 @@ impl CustomWindowsUtils {
                 }
 
                 if ImGuiUtils::draw_image(ui, identifier, *width, *height, texture_id) {
-                    self.execute_rune_code(rune_code);
+                    self.add_callback(
+                        identifier,
+                        callback,
+                        CallbackType::Button(identifier.to_owned(), Rc::clone(opt_param)),
+                    );
                 }
             }
             WidgetType::InputTextMultiLine(
@@ -876,9 +869,7 @@ impl CustomWindowsUtils {
                 return;
             };
 
-            if let WidgetType::Image(image_path, width, height, _overlay, _background, _rune_code) =
-                &mut *widget
-            {
+            if let WidgetType::Image(image_path, width, height, ..) = &mut *widget {
                 *image_path = new_image_path;
                 *width = width_height[0];
                 *height = width_height[1];
@@ -952,11 +943,6 @@ impl CustomWindowsUtils {
         };
 
         window_widgets.retain(|identifier, _| identifiers.contains(identifier));
-    }
-
-    /// Gets the pending scripts to be executed.
-    pub const fn get_pending_scripts(&self) -> &AtomicRefCell<Option<Vec<String>>> {
-        &self.pending_scripts
     }
 
     /// Gets the value of `self.cached_images`.

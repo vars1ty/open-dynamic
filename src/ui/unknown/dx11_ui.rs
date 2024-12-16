@@ -141,29 +141,6 @@ impl DX11UI {
         self.can_toggle_ui = true;
     }
 
-    /// Executes pending scripts that were received from custom windows.
-    /// They aren't instantly executed from the window due to stability concerns.
-    fn execute_pending_scripts(&self) {
-        let Some(base_core_reader) = self.base_core.try_read() else {
-            return;
-        };
-
-        let custom_window_utils = base_core_reader.get_custom_window_utils();
-        let Some(pending_scripts) = custom_window_utils
-            .get_pending_scripts()
-            .try_borrow_mut()
-            .ok()
-            .and_then(|mut pending_scripts| pending_scripts.take())
-        else {
-            return;
-        };
-
-        let script_core = base_core_reader.get_script_core();
-        pending_scripts.into_iter().for_each(|script| {
-            script_core.execute(script, Arc::clone(&self.base_core), false, false)
-        });
-    }
-
     /// Caches uninitialized textures for custom windows.
     fn load_unitialized_textures(&mut self, render_context: &mut dyn RenderContext) {
         let Some(cached_images) = self
@@ -272,7 +249,6 @@ impl ImguiRenderLoop for DX11UI {
         imgui_utils_reader.draw_screen_messages(ui);
         drop(imgui_utils_reader);
 
-        self.execute_pending_scripts();
         self.on_toggle_ui();
         if !self.display_ui {
             return;

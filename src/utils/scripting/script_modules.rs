@@ -222,7 +222,7 @@ impl SystemModules {
 
         let base_core_clone = Arc::clone(&base_core);
         arctic_module
-            .function("inject_gateway", move |dll_name| {
+            .function("inject_plugin", move |dll_name| {
                 base_core_clone
                     .read()
                     .get_arctic_core()
@@ -236,7 +236,7 @@ impl SystemModules {
 
         let base_core_clone = Arc::clone(&base_core);
         arctic_module
-            .function("is_gateway_active", move |identifier| {
+            .function("is_plugin_active", move |identifier| {
                 base_core_clone
                     .read()
                     .get_arctic_core()
@@ -686,19 +686,12 @@ impl UIModules {
         module
             .function(
                 "add_button",
-                |identifier: String, text, function: Function, opt_param| {
+                |identifier: String, text, function, opt_param| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::Button(
                             text,
-                            Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
-                                crash!(
-                                    "[ERROR Failed turning Function into SyncFunction at \"",
-                                    identifier,
-                                    "\", error: ",
-                                    error
-                                )
-                            })),
+                            Self::function_into_sync(function, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -729,7 +722,7 @@ impl UIModules {
                             min,
                             max,
                             default_value,
-                            Rc::new(Self::function_into_sync(function, identifier)),
+                            Self::function_into_sync(function, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -748,7 +741,7 @@ impl UIModules {
                             min,
                             max,
                             default_value,
-                            Rc::new(Self::function_into_sync(function, identifier)),
+                            Self::function_into_sync(function, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -795,10 +788,18 @@ impl UIModules {
         module
             .function(
                 "add_image",
-                |identifier, image_path, width, height, rune_code| {
+                |identifier: String, image_path, (width, height), callback, opt_param| {
                     custom_window_utils.add_widget(
-                        identifier,
-                        WidgetType::Image(image_path, width, height, false, false, rune_code),
+                        identifier.to_owned(),
+                        WidgetType::Image(
+                            image_path,
+                            width,
+                            height,
+                            false,
+                            false,
+                            Self::function_into_sync(callback, identifier),
+                            Rc::new(opt_param),
+                        ),
                     )
                 },
             )
@@ -807,10 +808,18 @@ impl UIModules {
         module
             .function(
                 "add_image_overlay",
-                |identifier, image_path, width, height| {
+                |identifier: String, image_path, (width, height), callback, opt_param| {
                     custom_window_utils.add_widget(
-                        identifier,
-                        WidgetType::Image(image_path, width, height, true, false, "".to_owned()),
+                        identifier.to_owned(),
+                        WidgetType::Image(
+                            image_path,
+                            width,
+                            height,
+                            true,
+                            false,
+                            Self::function_into_sync(callback, identifier),
+                            Rc::new(opt_param),
+                        ),
                     )
                 },
             )
@@ -819,10 +828,18 @@ impl UIModules {
         module
             .function(
                 "add_image_background",
-                |identifier, image_path, width, height| {
+                |identifier: String, image_path, (width, height)| {
                     custom_window_utils.add_widget(
-                        identifier,
-                        WidgetType::Image(image_path, width, height, false, true, "".to_owned()),
+                        identifier.to_owned(),
+                        WidgetType::Image(
+                            image_path,
+                            width,
+                            height,
+                            false,
+                            true,
+                            Self::function_into_sync(Function::new(|| {}), identifier),
+                            Rc::new(None),
+                        ),
                     )
                 },
             )
@@ -872,7 +889,7 @@ impl UIModules {
                             String::default(),
                             width,
                             height,
-                            Rc::new(Self::function_into_sync(callback, identifier)),
+                            Self::function_into_sync(callback, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -935,7 +952,7 @@ impl UIModules {
                         WidgetType::Checkbox(
                             text,
                             checked,
-                            Rc::new(Self::function_into_sync(on_value_changed, identifier)),
+                            Self::function_into_sync(on_value_changed, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -946,16 +963,16 @@ impl UIModules {
         Ok(module)
     }
 
-    /// Turns `Function` into a `SyncFunction`, crashing if it fails.
-    fn function_into_sync(function: Function, identifier: String) -> SyncFunction {
-        function.into_sync().into_result().unwrap_or_else(|error| {
+    /// Turns `Function` into a `Rc<SyncFunction>`, crashing if it fails.
+    fn function_into_sync(function: Function, identifier: String) -> Rc<SyncFunction> {
+        Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
             crash!(
                 "[ERROR Failed turning Function into SyncFunction at \"",
                 identifier,
                 "\", error: ",
                 error
             )
-        })
+        }))
     }
 
     /// Helper function for making it easier to add sub-widgets.
@@ -971,7 +988,7 @@ impl UIModules {
             WidgetType::SubWidget(
                 sub_widget_type,
                 Default::default(),
-                Rc::new(Self::function_into_sync(call_once, section_identifier)),
+                Self::function_into_sync(call_once, section_identifier),
                 Rc::new(opt_param),
             ),
         )

@@ -15,7 +15,15 @@ pub enum WidgetType {
     I32Slider(String, i32, i32, i32, Rc<SyncFunction>, Rc<Option<Value>>),
     NextWidgetWidth(f32),
     SameLine,
-    Image(String, f32, f32, bool, bool, String),
+    Image(
+        String,
+        f32,
+        f32,
+        bool,
+        bool,
+        Rc<SyncFunction>,
+        Rc<Option<Value>>,
+    ),
     InputTextMultiLine(
         String,
         String,
