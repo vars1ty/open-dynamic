@@ -6,6 +6,7 @@ use rune::Value;
 /// No safety is included with this, use at your own risk!
 pub struct FNCaller;
 
+#[allow(clippy::too_many_arguments)]
 impl FNCaller {
     /// Takes the function pointer and the paramaters in form of a `Vec<i64>`.
     /// If there are more than 10 entries in `params`, this function sends an error message

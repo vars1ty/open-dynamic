@@ -32,6 +32,7 @@ enum CallbackType {
     I32Slider(String, i32, Rc<Option<Value>>),
     F32Slider(String, f32, Rc<Option<Value>>),
     Checkbox(String, bool, Rc<Option<Value>>),
+    InputTextMultiLine(String, String, Rc<Option<Value>>),
 }
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
@@ -206,6 +207,22 @@ impl CustomWindowsUtils {
                         );
                     }
                 }
+                CallbackType::InputTextMultiLine(identifier, current_value, opt_param) => {
+                    if let Err(error) = callback
+                        .call::<(&str, Option<&Value>), ()>((
+                            current_value,
+                            opt_param.as_ref().as_ref(),
+                        ))
+                        .into_result()
+                    {
+                        log!(
+                            "[ERROR] Failed calling input text multiline function on \"",
+                            identifier,
+                            "\", error: ",
+                            error
+                        );
+                    }
+                }
                 _ => crash!("[ERROR] Invalid callback type!"),
             }
         }
@@ -359,33 +376,28 @@ impl CustomWindowsUtils {
                     self.execute_rune_code(rune_code);
                 }
             }
-            /*WidgetType::CenteredWidgets(widgets, custom_y, group_size) => {
-                let new_group_size = ImGuiUtils::draw_centered_widgets(
-                    ui,
-                    ui.window_size(),
-                    group_size,
-                    *custom_y,
-                    || {
-                        let widgets = widgets.iter_mut().filter(|(identifier, _)| {
-                            !self.hidden_widgets.lock().contains(identifier)
-                        });
-
-                        for (identifier, widget) in widgets {
-                            self.handle_widget(
-                                Arc::clone(&base_core),
-                                ui,
-                                identifier,
-                                Arc::make_mut(widget),
-                            );
-                        }
-                    },
-                );
-
-                *group_size = new_group_size;
-            }*/
-            WidgetType::InputTextMultiLine(label, text_input, width, height) => {
-                ui.input_text_multiline(label, text_input, [*width, *height])
-                    .build();
+            WidgetType::InputTextMultiLine(
+                label,
+                text_input,
+                width,
+                height,
+                callback,
+                opt_param,
+            ) => {
+                if ui
+                    .input_text_multiline(label, text_input, [*width, *height])
+                    .build()
+                {
+                    self.add_callback(
+                        identifier,
+                        callback,
+                        CallbackType::InputTextMultiLine(
+                            identifier.to_owned(),
+                            text_input.to_owned(),
+                            Rc::clone(opt_param),
+                        ),
+                    );
+                }
             }
             WidgetType::SubWidget(sub_widget, widgets, ..) => {
                 self.handle_sub_widget(ui, Arc::clone(&base_core), sub_widget, widgets);
@@ -423,7 +435,6 @@ impl CustomWindowsUtils {
             .iter()
             .filter(|(identifier, _)| !hidden_widgets.contains(identifier));
         match sub_widget {
-            SubWidgetType::CenteredWidgets(_, _) => {}
             SubWidgetType::CollapsingHeader(text) => {
                 if !ui.collapsing_header(text, TreeNodeFlags::OPEN_ON_ARROW) {
                     return;
@@ -822,7 +833,7 @@ impl CustomWindowsUtils {
     /// Attempts to get the value of a i32-slider in the currently-active window.
     pub fn get_input_text_multiline_value(&self, identifier: String) -> Option<String> {
         let widget = self.get_widget(&identifier)?;
-        let WidgetType::InputTextMultiLine(_, input, _, _) = &*widget.borrow() else {
+        let WidgetType::InputTextMultiLine(_, input, _, _, _, _) = &*widget.borrow() else {
             return None;
         };
 

@@ -721,22 +721,15 @@ impl UIModules {
         module
             .function(
                 "add_f32_slider",
-                |identifier: String, text, (min, max), function: Function, opt_param| {
+                |identifier: String, text, (min, max, default_value), function, opt_param| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::F32Slider(
                             text,
                             min,
                             max,
-                            min,
-                            Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
-                                crash!(
-                                    "[ERROR Failed turning Function into SyncFunction at \"",
-                                    identifier,
-                                    "\", error: ",
-                                    error
-                                )
-                            })),
+                            default_value,
+                            Rc::new(Self::function_into_sync(function, identifier)),
                             Rc::new(opt_param),
                         ),
                     )
@@ -747,22 +740,15 @@ impl UIModules {
         module
             .function(
                 "add_i32_slider",
-                |identifier: String, text, (min, max), function: Function, opt_param| {
+                |identifier: String, text, (min, max, default_value), function, opt_param| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::I32Slider(
                             text,
                             min,
                             max,
-                            min,
-                            Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
-                                crash!(
-                                    "[ERROR Failed turning Function into SyncFunction at \"",
-                                    identifier,
-                                    "\", error: ",
-                                    error
-                                )
-                            })),
+                            default_value,
+                            Rc::new(Self::function_into_sync(function, identifier)),
                             Rc::new(opt_param),
                         ),
                     )
@@ -878,10 +864,17 @@ impl UIModules {
         module
             .function(
                 "add_input_text_multiline",
-                |identifier, label, width, height| {
+                |identifier: String, label, (width, height), callback, opt_param| {
                     custom_window_utils.add_widget(
-                        identifier,
-                        WidgetType::InputTextMultiLine(label, String::default(), width, height),
+                        identifier.to_owned(),
+                        WidgetType::InputTextMultiLine(
+                            label,
+                            String::default(),
+                            width,
+                            height,
+                            Rc::new(Self::function_into_sync(callback, identifier)),
+                            Rc::new(opt_param),
+                        ),
                     )
                 },
             )

@@ -16,7 +16,14 @@ pub enum WidgetType {
     NextWidgetWidth(f32),
     SameLine,
     Image(String, f32, f32, bool, bool, String),
-    InputTextMultiLine(String, String, f32, f32),
+    InputTextMultiLine(
+        String,
+        String,
+        f32,
+        f32,
+        Rc<SyncFunction>,
+        Rc<Option<Value>>,
+    ),
 
     /// Advanced widget which hosts more complex widgets, like collapsing headers.
     SubWidget(
@@ -32,6 +39,5 @@ pub enum WidgetType {
 /// Sub-widget type, aka types like collapsing headers and alike.
 #[derive(Clone)]
 pub enum SubWidgetType {
-    CenteredWidgets(Option<f32>, [f32; 2]),
     CollapsingHeader(String),
 }
