@@ -198,8 +198,6 @@ impl SystemModules {
                 value.lerp(to, time)
             })
             .build()?;
-        math_module.function("ptr_add", Self::ptr_add).build()?;
-        math_module.function("ptr_sub", Self::ptr_sub).build()?;
 
         let serials_clone = Arc::clone(&serials);
         sellix_module
@@ -320,6 +318,13 @@ impl SystemModules {
             .function("get_global", move |variable_name| {
                 Self::get_global(variable_name, Arc::clone(&global_script_variables_clone))
             })
+            .build()?;
+
+        std_module
+            .function("f32_approx_eq", |value: f32, compare: f32| value == compare)
+            .build()?;
+        std_module
+            .function("f64_approx_eq", |value: f64, compare: f64| value == compare)
             .build()?;
 
         Ok(vec![
