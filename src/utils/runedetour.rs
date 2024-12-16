@@ -297,11 +297,11 @@ impl RDetour {
     }
 
     /// Drops a detour from `address` if there's any installed RDetours at that address.
-    pub fn drop_rdetour_at(address: i64) {
+    pub fn drop_rdetour_at(address: i64) -> bool {
         let address = address as *const i64;
         let Some(rune_detours) = RUNE_DETOURS.try_read() else {
             log!("[ERROR] rune_detours is locked, cannot access RDetours!");
-            return;
+            return false;
         };
 
         let Some(rdetour) = rune_detours.iter().find(|rdetour| {
@@ -316,11 +316,7 @@ impl RDetour {
                 .unwrap_or_default()
                 == address as i64
         }) else {
-            log!(
-                "[ERROR] No RDetour has been installed at ",
-                format!("{address:?}")
-            );
-            return;
+            return false;
         };
 
         let Some(mut rdetour) = rdetour.try_write() else {
@@ -329,7 +325,7 @@ impl RDetour {
                 format!("{address:?}"),
                 " is locked and cannot be modified!"
             );
-            return;
+            return false;
         };
 
         let Some(detour) = rdetour.detour.take() else {
@@ -340,7 +336,7 @@ impl RDetour {
                 format!("{address:?}"),
                 "!"
             );
-            return;
+            return false;
         };
 
         if detour.is_enabled() {
@@ -353,7 +349,7 @@ impl RDetour {
                     ", error: ",
                     error
                 );
-                return;
+                return false;
             }
         }
 
@@ -367,6 +363,7 @@ impl RDetour {
             format!("{address:?}"),
             " has been dropped!"
         );
+        true
     }
 
     /// Returns `self.from_ptr`.
