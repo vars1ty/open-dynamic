@@ -32,6 +32,7 @@ use std::{
 };
 use windows::Win32::System::Threading::GetCurrentProcess;
 use wmem::Memory;
+use zstring::ZString;
 
 /// System modules, like Memory operations and such.
 pub struct SystemModules;
@@ -397,16 +398,6 @@ impl SystemModules {
         WinUtils::ptr_to_string(address as _).unwrap_or_default()
     }
 
-    /// Adds `add` to the pointer, then returns the new value.
-    fn ptr_add(address: i64, add: i64) -> i64 {
-        address + add
-    }
-
-    /// Subtracts `sub` from the pointer, then returns the new value.
-    fn ptr_sub(address: i64, sub: i64) -> i64 {
-        address + sub
-    }
-
     /// Scans for a pattern in memory.
     fn pattern_scan(hex_string: String, address_type: AddressType) -> Vec<i64> {
         let ptr = hex_string.as_ptr();
@@ -659,14 +650,16 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_label", |identifier, content| {
-                custom_window_utils.add_widget(identifier, WidgetType::Label(content, 0))
+            .function("add_label", |identifier, content: String| {
+                custom_window_utils
+                    .add_widget(identifier, WidgetType::Label(ZString::new(content), 0))
             })
             .build()?;
 
         module
-            .function("add_bold_label", |identifier, content| {
-                custom_window_utils.add_widget(identifier, WidgetType::Label(content, 2));
+            .function("add_bold_label", |identifier, content: String| {
+                custom_window_utils
+                    .add_widget(identifier, WidgetType::Label(ZString::new(content), 2));
             })
             .build()?;
 
@@ -691,11 +684,11 @@ impl UIModules {
         module
             .function(
                 "add_button",
-                |identifier: String, text, function, opt_param| {
+                |identifier: String, text: String, function, opt_param| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::Button(
-                            text,
+                            ZString::new(text),
                             Self::function_into_sync(function, identifier),
                             Rc::new(opt_param),
                         ),
@@ -719,11 +712,15 @@ impl UIModules {
         module
             .function(
                 "add_f32_slider",
-                |identifier: String, text, (min, max, default_value), function, opt_param| {
+                |identifier: String,
+                 text: String,
+                 (min, max, default_value),
+                 function,
+                 opt_param| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::F32Slider(
-                            text,
+                            ZString::new(text),
                             min,
                             max,
                             default_value,
@@ -738,11 +735,15 @@ impl UIModules {
         module
             .function(
                 "add_i32_slider",
-                |identifier: String, text, (min, max, default_value), function, opt_param| {
+                |identifier: String,
+                 text: String,
+                 (min, max, default_value),
+                 function,
+                 opt_param| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::I32Slider(
-                            text,
+                            ZString::new(text),
                             min,
                             max,
                             default_value,
@@ -886,11 +887,11 @@ impl UIModules {
         module
             .function(
                 "add_input_text_multiline",
-                |identifier: String, label, (width, height), callback, opt_param| {
+                |identifier: String, label: String, (width, height), callback, opt_param| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::InputTextMultiLine(
-                            label,
+                            ZString::new(label),
                             String::default(),
                             width,
                             height,
@@ -930,12 +931,12 @@ impl UIModules {
             .function(
                 "add_collapsing_section",
                 move |section_identifier: String,
-                      text,
+                      text: String,
                       call_once: Function,
                       opt_param: Option<Value>| {
                     Self::add_sub_widget(
                         section_identifier,
-                        SubWidgetType::CollapsingHeader(text),
+                        SubWidgetType::CollapsingHeader(ZString::new(text)),
                         call_once,
                         opt_param,
                         custom_window_utils,
@@ -948,14 +949,14 @@ impl UIModules {
             .function(
                 "add_checkbox",
                 |identifier: String,
-                 text,
+                 text: String,
                  checked,
                  on_value_changed: Function,
                  opt_param: Option<Value>| {
                     custom_window_utils.add_widget(
                         identifier.to_owned(),
                         WidgetType::Checkbox(
-                            text,
+                            ZString::new(text),
                             checked,
                             Self::function_into_sync(on_value_changed, identifier),
                             Rc::new(opt_param),

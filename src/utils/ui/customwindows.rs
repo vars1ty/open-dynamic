@@ -121,6 +121,45 @@ impl CustomWindowsUtils {
         self.call_pending_callbacks();
     }
 
+    /// Calls the callback `SyncFunction` with `(T, opt_param)`.
+    /// If `None`, then the function is called with just `opt_param` passed into it.
+    fn call_callback<T: rune::ToValue>(
+        callback: &Rc<SyncFunction>,
+        t_value: Option<T>,
+        opt_param: &Rc<Option<Value>>,
+        widget_string_type: ZString,
+        identifier: &str,
+    ) {
+        let Some(t_value) = t_value else {
+            if let Err(error) = callback
+                .call::<(Option<&Value>,), ()>((opt_param.as_ref().as_ref(),))
+                .into_result()
+            {
+                log!(
+                    "[ERROR] Failed calling button function on \"",
+                    identifier,
+                    "\", error: ",
+                    error
+                );
+            }
+            return;
+        };
+
+        if let Err(error) = callback
+            .call::<(T, Option<&Value>), ()>((t_value, opt_param.as_ref().as_ref()))
+            .into_result()
+        {
+            log!(
+                "[ERROR] Failed calling",
+                widget_string_type,
+                " function on \"",
+                identifier,
+                "\", error: ",
+                error
+            );
+        }
+    }
+
     /// Calls all pending callbacks.
     fn call_pending_callbacks(&self) {
         let Some(mut pending_callbacks) = self.pending_callbacks.try_lock() else {
@@ -130,79 +169,46 @@ impl CustomWindowsUtils {
 
         for (callback, callback_type) in &*pending_callbacks {
             match callback_type {
-                CallbackType::Button(identifier, opt_param) => {
-                    if let Err(error) = callback
-                        .call::<(Option<&Value>,), ()>((opt_param.as_ref().as_ref(),))
-                        .into_result()
-                    {
-                        log!(
-                            "[ERROR] Failed calling button function on \"",
-                            identifier,
-                            "\", error: ",
-                            error
-                        );
-                    }
-                }
+                CallbackType::Button(identifier, opt_param) => Self::call_callback::<()>(
+                    callback,
+                    None,
+                    opt_param,
+                    zencstr!("Button"),
+                    identifier,
+                ),
                 CallbackType::I32Slider(identifier, current_value, opt_param) => {
-                    if let Err(error) = callback
-                        .call::<(i32, Option<&Value>), ()>((
-                            *current_value,
-                            opt_param.as_ref().as_ref(),
-                        ))
-                        .into_result()
-                    {
-                        log!(
-                            "[ERROR] Failed calling i32 slider function on \"",
-                            identifier,
-                            "\", error: ",
-                            error
-                        );
-                    }
+                    Self::call_callback(
+                        callback,
+                        Some(*current_value),
+                        opt_param,
+                        zencstr!("i32 Slider"),
+                        identifier,
+                    )
                 }
                 CallbackType::F32Slider(identifier, current_value, opt_param) => {
-                    if let Err(error) = callback
-                        .call::<(f32, Option<&Value>), ()>((
-                            *current_value,
-                            opt_param.as_ref().as_ref(),
-                        ))
-                        .into_result()
-                    {
-                        log!(
-                            "[ERROR] Failed calling i32 slider function on \"",
-                            identifier,
-                            "\", error: ",
-                            error
-                        );
-                    }
+                    Self::call_callback(
+                        callback,
+                        Some(*current_value),
+                        opt_param,
+                        zencstr!("f32 Slider"),
+                        identifier,
+                    )
                 }
-                CallbackType::Checkbox(identifier, checked, opt_param) => {
-                    if let Err(error) = callback
-                        .call::<(bool, Option<&Value>), ()>((*checked, opt_param.as_ref().as_ref()))
-                        .into_result()
-                    {
-                        log!(
-                            "[ERROR] Failed calling checkbox function on \"",
-                            identifier,
-                            "\", error: ",
-                            error
-                        );
-                    }
-                }
+                CallbackType::Checkbox(identifier, checked, opt_param) => Self::call_callback(
+                    callback,
+                    Some(*checked),
+                    opt_param,
+                    zencstr!("Checkbox"),
+                    identifier,
+                ),
                 CallbackType::InputTextMultiLine(identifier, current_value, opt_param) => {
-                    if let Err(error) = callback
-                        .call::<(&str, Option<&Value>), ()>((
-                            current_value,
-                            opt_param.as_ref().as_ref(),
-                        ))
-                        .into_result()
-                    {
-                        log!(
-                            "[ERROR] Failed calling input text multiline function on \"",
-                            identifier,
-                            "\", error: ",
-                            error
-                        );
-                    }
+                    Self::call_callback::<&str>(
+                        callback,
+                        Some(current_value),
+                        opt_param,
+                        zencstr!("i32 slider"),
+                        identifier,
+                    )
                 }
                 _ => crash!("[ERROR] Invalid callback type!"),
             }
@@ -792,7 +798,7 @@ impl CustomWindowsUtils {
 
         let mut widget = widget.unwrap();
         if let WidgetType::Label(text, _) = &mut *widget {
-            *text = new_text;
+            text.data = new_text;
             return;
         }
 
