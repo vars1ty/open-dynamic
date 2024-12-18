@@ -1,5 +1,7 @@
+use crate::globals::IS_PROCESSING_GIF;
 use crate::mod_cores::base_core::BaseCore;
 use crate::utils::dynwidget::SubWidgetType;
+use crate::utils::eguiutils::{CustomTexture, CustomTextureType};
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, stringutils::StringUtils};
 use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
@@ -7,6 +9,7 @@ use hudhook::imgui::{self, Condition, TextureId, TreeNodeFlags};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{alloc::clone::TryClone, runtime::SyncFunction, Value};
+use std::collections::HashMap;
 use std::{
     cell::Cell,
     rc::Rc,
@@ -53,7 +56,7 @@ pub struct CustomWindowsUtils {
     window_size_constraints: Mutex<Vec<[f32; 4]>>,
 
     /// Cached GPU TextureIds, key being the path to the image.
-    cached_images: DashMap<String, Option<TextureId>>,
+    cached_images: RwLock<HashMap<String, CustomTexture>>,
 
     /// Current cursor point.
     /// Allowed to be non-thread-safe as it doesn't matter.
@@ -206,7 +209,7 @@ impl CustomWindowsUtils {
                         callback,
                         Some(current_value),
                         opt_param,
-                        zencstr!("i32 slider"),
+                        zencstr!("i32 Slider"),
                         identifier,
                     )
                 }
@@ -247,6 +250,11 @@ impl CustomWindowsUtils {
         widget: &AtomicRefCell<WidgetType>,
     ) {
         let Ok(mut widget) = widget.try_borrow_mut() else {
+            log!(
+                "[ERROR] Failed borrowing \"",
+                identifier,
+                "\" as mutable because it's busy, render skipped!"
+            );
             return;
         };
 
@@ -336,10 +344,12 @@ impl CustomWindowsUtils {
                 background,
                 callback,
                 opt_param,
+                requested_texture_id,
             ) => {
                 let Some(texture_id) =
                     self.get_texture_id(image_path, base_core.read().get_config().get_path())
                 else {
+                    *requested_texture_id = true;
                     return;
                 };
 
@@ -875,7 +885,15 @@ impl CustomWindowsUtils {
                 return;
             };
 
-            if let WidgetType::Image(image_path, width, height, ..) = &mut *widget {
+            if let WidgetType::Image(image_path, width, height, _, _, _, _, requested_texture_id) =
+                &mut *widget
+            {
+                // Don't allow for image replacements until the image has loaded at least once.
+                // If we do, then it might get replaced too fast and end up never showing.
+                if !*requested_texture_id {
+                    return;
+                }
+
                 *image_path = new_image_path;
                 *width = width_height[0];
                 *height = width_height[1];
@@ -886,25 +904,68 @@ impl CustomWindowsUtils {
 
     /// Clears all cached images.
     pub fn clear_cached_images(&self) {
-        self.cached_images.clear();
+        let Some(mut cached_textures) = self.cached_images.try_write() else {
+            log!("[ERROR] Cached textures is locked, cannot clear!");
+            return;
+        };
+
+        cached_textures.clear();
     }
 
     /// Gets the Texture ID for an image. If it hasn't been cached already, then it's cached and
     /// returned.
     pub fn get_texture_id(&self, image_path: &str, config_dir_path: &str) -> Option<TextureId> {
+        if IS_PROCESSING_GIF.load(Ordering::Relaxed) {
+            log!("[ERROR] IS_PROCESSING_GIF is true!");
+            return None;
+        }
+
         let mut full_image_path = ZString::new(String::with_capacity(
             config_dir_path.len() + image_path.len(),
         ));
         full_image_path.data.push_str(config_dir_path);
         full_image_path.data.push_str(image_path);
 
-        if let Some(cached_image) = self.cached_images.get(&full_image_path.data) {
-            *cached_image
+        let texture_type = if full_image_path.data.ends_with(&zencstr!(".gif").data) {
+            CustomTextureType::Gif
+        } else if full_image_path.data.contains(&zencstr!(".gif.frame_").data) {
+            CustomTextureType::GifFrame
         } else {
-            self.cached_images
-                .insert(std::mem::take(&mut full_image_path.data), None);
-            None
+            CustomTextureType::Singular
+        };
+
+        // Do NOT add GifFrames, that's not up to this function.
+        if texture_type == CustomTextureType::GifFrame {
+            return if let Some(cached_textures) = self.cached_images.try_read() {
+                cached_textures.get(&full_image_path.data)?.texture_id
+            } else {
+                log!("[ERROR] Cached textures is locked, cannot get TextureId!");
+                None
+            };
         }
+
+        let Some(mut cached_textures) = self.cached_images.try_write() else {
+            log!("[ERROR] Cached textures is locked, cannot insert new request for TextureId lookup!");
+            return None;
+        };
+
+        let Some(cached_texture) = cached_textures.get(&full_image_path.data) else {
+            cached_textures.insert(
+                full_image_path.data.to_owned(),
+                CustomTexture {
+                    texture_id: None,
+                    texture_type,
+                },
+            );
+            log!(
+                "Texture Loader: Scheduled \"",
+                full_image_path,
+                "\" for upload to the GPU!"
+            );
+            return None;
+        };
+
+        cached_texture.texture_id
     }
 
     /// Hides a set of widgets by their identifiers from all windows.
@@ -952,7 +1013,7 @@ impl CustomWindowsUtils {
     }
 
     /// Gets the value of `self.cached_images`.
-    pub const fn get_cached_images(&self) -> &DashMap<String, Option<TextureId>> {
+    pub const fn get_cached_images(&self) -> &RwLock<HashMap<String, CustomTexture>> {
         &self.cached_images
     }
 }

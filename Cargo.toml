@@ -32,6 +32,7 @@ ahash = "0.8.11"
 image = "0.24.9"
 rkyv = "0.7.45"
 rune = "0.13.4"
+gif = "0.13.1"
 
 [profile.release]
 overflow-checks = true

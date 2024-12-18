@@ -7,8 +7,25 @@ use crate::{
 use dashmap::DashMap;
 use hudhook::imgui::{self, internal::DataTypeKind, sys::*, *};
 use parking_lot::RwLock;
-use std::sync::{Arc, LazyLock};
+use std::{
+    fs::File,
+    sync::{Arc, LazyLock},
+};
 use windows::Win32::Foundation::POINT;
+
+#[derive(Clone, Copy)]
+pub struct CustomTexture {
+    pub texture_type: CustomTextureType,
+    pub texture_id: Option<TextureId>,
+}
+
+/// Type for `CustomTexture`.
+#[derive(Clone, Copy, PartialEq)]
+pub enum CustomTextureType {
+    Singular,
+    Gif,
+    GifFrame,
+}
 
 #[derive(Default)]
 pub struct ContentFrameData {
@@ -406,5 +423,21 @@ impl ImGuiUtils {
         };
 
         ui.set_clipboard_text(text);
+    }
+
+    /// Extracts the frames of a GIF into a `Vec<Frame>`.
+    pub fn extract_gif_frames(path: &str) -> Vec<gif::Frame> {
+        let input = File::open(path)
+            .unwrap_or_else(|error| crash!("[ERROR] Failed opening GIF, error: ", error));
+        let mut options = gif::DecodeOptions::new();
+        options.set_color_output(gif::ColorOutput::RGBA);
+
+        let mut decoder = options.read_info(input).unwrap();
+        let mut frames = vec![];
+        while let Some(frame) = decoder.read_next_frame().unwrap() {
+            frames.push(frame.to_owned());
+        }
+
+        frames
     }
 }

@@ -24,6 +24,7 @@ pub enum WidgetType {
         bool,
         Rc<SyncFunction>,
         Rc<Option<Value>>,
+        bool
     ),
     InputTextMultiLine(
         ZString,

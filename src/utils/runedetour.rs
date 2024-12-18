@@ -23,10 +23,10 @@ macro_rules! generate_detour_id {
 
         let mut collected_args = Vec::with_capacity(10);
         for _ in 0..=10 {
-            collected_args.push(unsafe { $args.arg::<*const i64>() } as i64);
+            collected_args.push(unsafe { $args.arg::<*mut i64>() } as i64);
         }
 
-        RDetour::call_rune_function_on_id($id, collected_args) as *const i64
+        RDetour::call_rune_function_on_id($id, collected_args) as *mut i64
     }};
 }
 
@@ -34,7 +34,7 @@ macro_rules! generate_detour_id {
 /// inside it.
 macro_rules! generate_detour_holder {
     ($fn_name:ident, $id:literal) => {
-        unsafe extern "C" fn $fn_name(mut args: ...) -> *const i64 {
+        unsafe extern "C" fn $fn_name(mut args: ...) -> *mut i64 {
             generate_detour_id!($id, args)
         }
     };
@@ -356,13 +356,6 @@ impl RDetour {
         rdetour.from_ptr = None;
         drop(rdetour.rune_function.take());
         drop(detour);
-        log!(
-            "[RDetour] RDetour at ID ",
-            rdetour.get_detour_id(),
-            ", address ",
-            format!("{address:?}"),
-            " has been dropped!"
-        );
         true
     }
 

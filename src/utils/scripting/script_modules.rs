@@ -805,6 +805,7 @@ impl UIModules {
                             false,
                             Self::function_into_sync(callback, identifier),
                             Rc::new(opt_param),
+                            false
                         ),
                     )
                 },
@@ -825,6 +826,7 @@ impl UIModules {
                             false,
                             Self::function_into_sync(callback, identifier),
                             Rc::new(opt_param),
+                            false
                         ),
                     )
                 },
@@ -845,6 +847,7 @@ impl UIModules {
                             true,
                             Self::function_into_sync(Function::new(|| {}), identifier),
                             Rc::new(None),
+                            false
                         ),
                     )
                 },
@@ -964,6 +967,12 @@ impl UIModules {
                     )
                 },
             )
+            .build()?;
+
+        module
+            .function("is_processing_gif", || {
+                IS_PROCESSING_GIF.load(Ordering::Relaxed)
+            })
             .build()?;
 
         Ok(module)

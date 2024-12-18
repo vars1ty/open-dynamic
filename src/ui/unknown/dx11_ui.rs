@@ -1,8 +1,11 @@
 use crate::{
-    globals::{DELTA_TIME, IS_CURSOR_IN_UI},
+    globals::{DELTA_TIME, IS_CURSOR_IN_UI, IS_PROCESSING_GIF},
     mod_cores::base_core::BaseCore,
     ui::community::CommunityWindow,
-    utils::{eguiutils::ImGuiUtils, extensions::OptionExt},
+    utils::{
+        eguiutils::{CustomTexture, CustomTextureType, ImGuiUtils},
+        extensions::OptionExt,
+    },
     winutils::WinUtils,
 };
 use hudhook::{
@@ -10,7 +13,10 @@ use hudhook::{
     ImguiRenderLoop, RenderContext,
 };
 use parking_lot::RwLock;
-use std::sync::{atomic::Ordering, Arc, OnceLock};
+use std::{
+    collections::HashMap,
+    sync::{atomic::Ordering, Arc, OnceLock},
+};
 use windows::Win32::Foundation::POINT;
 
 /// Simple basic ImGui windows, responsible for also drawing custom windows.
@@ -148,57 +154,136 @@ impl DX11UI {
             .try_read()
             .map(|reader| reader.get_custom_window_utils().get_cached_images())
         else {
+            log!("[ERROR] Failed reading BaseCore as it's currently busy, cannot load uninitialized textures!");
+            return;
+        };
+
+        let Some(mut cached_textures) = cached_images.try_write() else {
+            log!("[ERROR] Cached textures is locked, cannot load uninitialized textures!");
             return;
         };
 
         // Only get the uninitialized textures.
-        let uninitialized_textures = cached_images
-            .iter_mut()
-            .filter(|entry| entry.value().is_none());
+        let uninitialized_textures = cached_textures.iter_mut().filter(|entry| {
+            entry.1.texture_type != CustomTextureType::GifFrame && entry.1.texture_id.is_none()
+        });
 
-        for mut entry in uninitialized_textures {
-            let image_path = entry.key();
-            let image = image::open(image_path);
+        let mut gif_image_path = None;
 
-            let Ok(image) = image else {
-                log!(
-                    "[ERROR] Failed loading image at path \"",
-                    image_path,
-                    "\" into memory, error: ",
-                    image.unwrap_err()
-                );
-                self.invalid_textures.push(image_path.to_owned());
-                return;
-            };
+        for (image_path, custom_texture) in uninitialized_textures {
+            let image_path = image_path.to_owned();
+            let texture_type = custom_texture.texture_type;
 
-            let loaded_texture_id = render_context.load_texture(
-                &image.to_rgba8().into_raw(),
-                image.width(),
-                image.height(),
-            );
+            match texture_type {
+                CustomTextureType::Gif => {
+                    log!("Texture Loader: Attempting to load GIF texture...");
+
+                    // Save path for after this for-loop, as otherwise we risk deadlocks due to
+                    // held-on resources.
+                    gif_image_path = Some(image_path);
+                }
+                CustomTextureType::GifFrame => {
+                    crash!("[ERROR] Attempted processing CustomTextureType::GifFrame, evading the filter!");
+                }
+                CustomTextureType::Singular => {
+                    let image = image::open(&image_path);
+                    let Ok(image) = image else {
+                        log!(
+                            "[ERROR] Failed loading image at path \"",
+                            image_path,
+                            "\" into memory, error: ",
+                            image.unwrap_err()
+                        );
+                        self.invalid_textures.push(image_path.to_owned());
+                        break;
+                    };
+
+                    let loaded_texture_id = render_context.load_texture(
+                        &image.to_rgba8().into_raw(),
+                        image.width(),
+                        image.height(),
+                    );
+                    let Ok(loaded_texture_id) = loaded_texture_id else {
+                        log!(
+                            "[ERROR] Failed loading image at path \"",
+                            image_path,
+                            "\" into the GPU, error: ",
+                            loaded_texture_id.unwrap_err()
+                        );
+                        self.invalid_textures.push(image_path.to_owned());
+                        break;
+                    };
+
+                    custom_texture.texture_id = Some(loaded_texture_id);
+                }
+            }
+        }
+
+        if let Some(image_path) = gif_image_path.take() {
+            IS_PROCESSING_GIF.store(true, Ordering::Relaxed);
+            self.load_gif_frames(&image_path, &mut cached_textures, render_context);
+            IS_PROCESSING_GIF.store(false, Ordering::Relaxed);
+        }
+
+        for invalid_texture in &self.invalid_textures {
+            cached_textures.remove(invalid_texture);
+        }
+
+        self.invalid_textures.clear();
+    }
+
+    /// Loads the frame of a GIF into the GPU and stores them as `image_path.[frame_number]`.
+    fn load_gif_frames(
+        &mut self,
+        image_path: &str,
+        cached_images: &mut HashMap<String, CustomTexture>,
+        render_context: &mut dyn RenderContext,
+    ) {
+        let extracted_frames = ImGuiUtils::extract_gif_frames(image_path);
+        for (i, frame) in extracted_frames.iter().enumerate() {
+            let loaded_texture_id =
+                render_context.load_texture(&frame.buffer, frame.width as u32, frame.height as u32);
             let Ok(loaded_texture_id) = loaded_texture_id else {
                 log!(
                     "[ERROR] Failed loading image at path \"",
                     image_path,
-                    "\" into the GPU, error: ",
+                    "\" into the GPU, frame: ",
+                    i,
+                    ", error: ",
                     loaded_texture_id.unwrap_err()
                 );
                 self.invalid_textures.push(image_path.to_owned());
                 return;
             };
 
-            *entry.value_mut() = Some(loaded_texture_id);
+            if i == 0 {
+                cached_images.insert(
+                    image_path.to_owned(),
+                    CustomTexture {
+                        texture_id: Some(loaded_texture_id),
+                        texture_type: CustomTextureType::Gif,
+                    },
+                );
+            }
+
+            let frame_path = ozencstr!(image_path, ".frame_", i);
+            log!("Texture Loader: Loaded frame ", i, " at path: ", frame_path);
+            cached_images.insert(
+                frame_path,
+                CustomTexture {
+                    texture_id: Some(loaded_texture_id),
+                    texture_type: CustomTextureType::GifFrame,
+                },
+            );
         }
 
-        if self.invalid_textures.is_empty() {
-            return;
-        }
-
-        for invalid_texture in &self.invalid_textures {
-            cached_images.remove(invalid_texture);
-        }
-
-        self.invalid_textures.clear();
+        log!(
+            "Texture Loader: GIF frames loaded from \"",
+            image_path,
+            "\", frames: ",
+            extracted_frames.len(),
+            "!"
+        );
     }
 }
 
@@ -232,8 +317,9 @@ impl ImguiRenderLoop for DX11UI {
     }
 
     /// Renders the UI.
-    fn render(&mut self, ui: &mut imgui::Ui) {
+    fn render<'a>(&mut self, ui: &mut imgui::Ui, _render_context: &'a mut dyn RenderContext) {
         DELTA_TIME.store(ui.io().delta_time, Ordering::SeqCst);
+        self.load_unitialized_textures(_render_context);
         ImGuiUtils::sync_clipboard(ui);
 
         let base_core = Arc::clone(&self.base_core);
