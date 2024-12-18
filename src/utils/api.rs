@@ -38,7 +38,7 @@ impl API {
 
         // Update this once the version changes, since using env!() doesn't inline the version for
         // it to be encrypted.
-        if zencstr!("6.5.0-release") != zencstr!(version.data) {
+        if zencstr!("6.6.0-release") != zencstr!(version.data) {
             crash!("[ERROR] Invalid version, switch to ", version)
         }
 
