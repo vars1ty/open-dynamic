@@ -11,11 +11,11 @@ crate-type = ["cdylib"]
 [dependencies]
 windows = { version = "0.51.1", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "System", "Win32_System_LibraryLoader", "Win32_System_Console", "Win32_UI_Input_KeyboardAndMouse", "Win32_Graphics_Gdi"] }
 retour = { git = "https://github.com/Hpmason/retour-rs.git", features = ["static-detour"] }
-flate2 = { version = "1.0.34", features = ["zlib"], default-features = false }
+flate2 = { version = "1.0.35", features = ["zlib"], default-features = false }
 zstring = { path = "/home/stackalloc/Git/zstring" }
 wmem = { path = "/home/stackalloc/Git/wmem" }
 sbyt = { path = "/home/stackalloc/Git/sbyt" }
-crossbeam-channel = "0.5.13"
+crossbeam-channel = "0.5.14"
 atomic_refcell = "0.1.13"
 clipboard-win = "5.4.0"
 serde_jsonc = "1.0.108"
@@ -23,8 +23,8 @@ parking_lot = "0.12.2"
 dll-syringe = "0.15.2"
 magic-crypt = "3.1.13"
 atomic_float = "1.1.0"
-message-io = "0.18.1"
-indexmap = "2.6.0"
+message-io = { path = "/home/stackalloc/Git/message-io" }
+indexmap = "2.7.0"
 hudhook = { path = "/home/stackalloc/Git/hudhook"}
 dashmap = "6.1.0"
 obfstr = "0.4.4"
