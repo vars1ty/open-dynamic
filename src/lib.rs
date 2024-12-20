@@ -33,19 +33,25 @@ use hudhook::{
 };
 use parking_lot::RwLock;
 use std::{ffi::c_void, io::IsTerminal, sync::Arc};
-use windows::Win32::System::Console::{AllocConsole, GetConsoleWindow};
+use windows::Win32::{
+    Foundation::HMODULE,
+    System::{
+        Console::{AllocConsole, GetConsoleWindow},
+        LibraryLoader::DisableThreadLibraryCalls,
+    },
+};
 use zstring::ZString;
 
 /// Called when the DLL has been injected/detached.
 #[unsafe(no_mangle)]
 #[allow(non_snake_case, unused_variables)]
 extern "system" fn DllMain(dll_module: isize, call_reason: u32, reserved: *const c_void) -> i32 {
-    std::env::set_var("RUST_BACKTRACE", "full");
     const DLL_PROCESS_ATTACH: u32 = 1;
     const DLL_PROCESS_DETACH: u32 = 0;
 
     match call_reason {
         DLL_PROCESS_ATTACH => {
+            let _ = unsafe { DisableThreadLibraryCalls(HMODULE(dll_module)) };
             std::thread::spawn(move || {
                 hook(dll_module);
             });
@@ -79,7 +85,8 @@ fn hook(hmodule: isize) {
     log!("Initializing Base Core...");
     let base_core = Arc::new(RwLock::new(BaseCore::init()));
     let base_core_reader = base_core.read();
-    log!("Base Core initialized, hooking...");
+    base_core_reader.link_script_received(Arc::clone(&base_core));
+    log!("Base Core initialized, determining ImGui renderer to use...");
 
     // If `free_console` is `true` and there's an allocated console, free the console.
     if allocated {
@@ -115,6 +122,7 @@ fn hook(hmodule: isize) {
 /// Prepares the hooking process and calls `hook_based_on_renderer`.
 fn prepare_hooks(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
     log!("Hooking into unknown process, proceed at your own risk!");
+    log!("HMODULE at ", format!("{:?}", hmodule as *const i64));
     hook_based_on_renderer(Arc::clone(&base_core), hmodule);
 }
 

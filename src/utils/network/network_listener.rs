@@ -64,10 +64,7 @@ impl NetworkListener {
                 if let Some(crosscom) = crosscom.try_read() {
                     match message.data_type {
                         DataType::SendScripts(script) => {
-                            if script.is_empty() {
-                                continue;
-                            }
-
+                            log!("Server Group: Incoming script, executing!");
                             callback(script);
                         }
                         _ => {

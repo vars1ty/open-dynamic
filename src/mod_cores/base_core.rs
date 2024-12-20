@@ -41,15 +41,7 @@ impl BaseCore {
     pub fn init() -> Self {
         let config: &'static Config = Box::leak(Box::default());
         let use_local_server = config.get_use_local_server();
-        let main_serial = Box::leak(Box::new(
-            config
-                .get_product_serials()
-                .first()
-                .unwrap_or_crash(zencstr!(
-                    "[ERROR] Missing primary serial, this should never happen!"
-                ))
-                .to_owned(),
-        ));
+        let startup_channel = config.get_startup_channel();
         RDetour::register_all_detours();
 
         Self {
@@ -57,20 +49,16 @@ impl BaseCore {
             crosscom: {
                 // Create username and channel as static strings.
                 let username: &'static str = StringUtils::get_random().leak();
-                let channel: &'static str = format!(
-                    "#{}0{}",
-                    StringUtils::get_random(),
-                    std::ptr::addr_of!(username) as i32
-                )
-                .leak();
+                let channel = startup_channel.unwrap_or_else(|| {
+                    format!(
+                        "#{}0{}",
+                        StringUtils::get_random(),
+                        std::ptr::addr_of!(username) as i32
+                    )
+                });
 
                 // Validate version as soon as we are connected.
-                API::validate_version(Self::connect_crosscom(
-                    username,
-                    channel,
-                    use_local_server,
-                    main_serial,
-                ))
+                API::validate_version(Self::connect_crosscom(username, channel, use_local_server))
             },
             script_core: LazyLock::new(|| Box::leak(Box::new(ScriptCore::init()))),
             custom_window_utils: LazyLock::new(|| Box::leak(Box::default())),
@@ -82,14 +70,12 @@ impl BaseCore {
     /// Attempts to connect to CrossCom's server.
     fn connect_crosscom(
         username: &'static str,
-        channel: &'static str,
+        channel: String,
         use_local_server: bool,
-        main_serial: &'static String,
     ) -> Arc<RwLock<CrossCom>> {
-        // Initialize instance.
         let instance = Arc::new(RwLock::new(CrossCom::init(
             username,
-            channel,
+            channel.to_owned(),
             use_local_server,
         )));
         let instance_clone = Arc::clone(&instance);
@@ -99,7 +85,7 @@ impl BaseCore {
                 "[ERROR] Failed reading CrossCom, cannot start connecting!"
             ));
 
-            reader.connect(main_serial);
+            reader.connect();
         });
 
         let reader = instance.try_read().unwrap_or_crash(zencstr!(
@@ -133,12 +119,30 @@ impl BaseCore {
                     log!("[PROMPT] Reconnecting...");
                     drop(prompt);
 
-                    break Self::connect_crosscom(username, channel, use_local_server, main_serial);
+                    break Self::connect_crosscom(username, channel, use_local_server);
                 }
 
                 crash!("[ERROR] Failed connecting to the server, perhaps your serial is incorrect, or the server is down?");
             }
         }
+    }
+
+    /// Hooks the `SendScripts` event and executes the source once received.
+    pub fn link_script_received(&self, self_arc: Arc<RwLock<Self>>) {
+        let crosscom = self.get_crosscom();
+        let Some(crosscom) = crosscom.try_read() else {
+            log!("[ERROR] Can't link script events to a callback, CrossCom is locked!");
+            return;
+        };
+
+        let script_core = self.get_script_core();
+        crosscom.get_network_listener().hook_on_script_received(
+            self.get_crosscom(),
+            move |script| {
+                let self_arc = Arc::clone(&self_arc);
+                script_core.execute(script, self_arc, false, false);
+            },
+        );
     }
 
     /// Returns the cached config instance.

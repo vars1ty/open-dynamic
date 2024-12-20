@@ -20,7 +20,6 @@ use std::{
 pub struct CrossComClientData {
     username: String,
     data_type: DataType,
-    serial_key: Option<String>,
 }
 
 /// CrossCom incoming server data.
@@ -46,7 +45,7 @@ pub enum DataType {
     #[default]
     None,
 
-    /// Called when requesting authentication from the server, requires a serial key.
+    /// Called when requesting authentication from the server, takes the startup channel.
     Auth(String),
 
     /// Received once authentication has completed.
@@ -115,9 +114,10 @@ impl CrossComClientData {
 
 /// Cross Communication between dynamic instances and a centralized server.
 pub struct CrossCom {
-    /// 0 -> Client Username.
-    /// 1 -> Startup Channel.
-    username_startup_channel: [&'static str; 2],
+    /// Client Username.
+    username: &'static str,
+
+    startup_channel: String,
 
     /// Use the local server?
     use_local_server: bool,
@@ -155,9 +155,12 @@ enum Signal {
 
 impl CrossCom {
     /// Initializes `CrossCom`.
-    pub fn init(username: &'static str, channel: &'static str, use_local_server: bool) -> Self {
+    pub fn init(username: &'static str, mut channel: String, use_local_server: bool) -> Self {
+        channel.truncate(64);
+
         Self {
-            username_startup_channel: [username, channel],
+            username,
+            startup_channel: channel.to_owned(),
             use_local_server,
             state: Cell::new(CrossComState::Disconnected),
             current_channel: RefCell::new(channel.to_owned()),
@@ -170,7 +173,7 @@ impl CrossCom {
     }
 
     /// Attempts to connect to the server.
-    pub fn connect(&self, serial: &'static String) {
+    pub fn connect(&self) {
         // Setup server.
         let (handler, listener) = node::split();
 
@@ -223,10 +226,7 @@ impl CrossCom {
                         crash!("[ERROR] CrossCom is already connected!");
                     }
 
-                    self.send_data_type(
-                        DataType::Auth(self.get_startup_channel().to_owned()),
-                        Some(serial),
-                    );
+                    self.send_data_type(DataType::Auth(self.get_startup_channel().to_owned()));
                 }
             },
         });
@@ -235,7 +235,7 @@ impl CrossCom {
     /// Handles all server data types.
     fn handle_server_data(&self, server_data: CrossComServerData) {
         match server_data.data_type {
-            DataType::AuthSuccess => self.send_data_type(DataType::GetVersion(None), None),
+            DataType::AuthSuccess => self.send_data_type(DataType::GetVersion(None)),
             DataType::GetVersion(ref version) => {
                 if version.is_none() {
                     return;
@@ -244,8 +244,8 @@ impl CrossCom {
                 self.set_state(CrossComState::Connected);
                 self.send_to_channel(server_data);
             }
-            DataType::SendScripts(ref scripts) => {
-                if server_data.username.is_some() && !scripts.is_empty() {
+            DataType::SendScripts(ref script) => {
+                if server_data.username.is_some() && !script.is_empty() {
                     self.send_to_channel(server_data);
                 }
             }
@@ -267,7 +267,7 @@ impl CrossCom {
     }
 
     /// Send a basic data type request.
-    pub fn send_data_type(&self, data_type: DataType, serial_key: Option<&'static String>) {
+    pub fn send_data_type(&self, data_type: DataType) {
         match data_type {
             DataType::UpdateChannelSuccess
             | DataType::AuthSuccess
@@ -289,9 +289,8 @@ impl CrossCom {
                     .unwrap_or_crash(zencstr!("[ERROR] Handler hasn't been assigned!"));
 
                 let data = CrossComClientData {
-                    username: self.username_startup_channel[0].to_owned(),
+                    username: self.username.to_owned(),
                     data_type,
-                    serial_key: serial_key.cloned(),
                 }
                 .to_vec();
                 handler.network().send(*server_endpoint, &data);
@@ -301,13 +300,13 @@ impl CrossCom {
 
     /// Sends the specified Rune script.
     pub fn send_script(&self, source: &str) {
-        self.send_data_type(DataType::SendScripts(source.to_owned()), None);
+        self.send_data_type(DataType::SendScripts(source.to_owned()));
         log!("[PARTY] Sent script to channel members!");
     }
 
     /// Sends the variables, if required to.
     pub fn send_variables(&self, variables: HashMap<String, String>) {
-        self.send_data_type(DataType::UpdateVariables(variables), None);
+        self.send_data_type(DataType::UpdateVariables(variables));
     }
 
     /// Sends the specified data type and waits for a server message to be received, then
@@ -315,7 +314,7 @@ impl CrossCom {
     /// `callback` should return true/false for whether or not the message was the correct one or
     /// not.
     fn send_and_wait<F: Fn(DataType) -> bool>(&self, send_data_type: DataType, callback: F) {
-        self.send_data_type(send_data_type, None);
+        self.send_data_type(send_data_type);
 
         loop {
             let Some(server_message) = self.get_network_listener().wait_for_message_raw() else {
@@ -433,8 +432,8 @@ impl CrossCom {
     }
 
     /// Returns the startup channel.
-    const fn get_startup_channel(&self) -> &str {
-        self.username_startup_channel[1]
+    fn get_startup_channel(&self) -> &str {
+        &self.startup_channel
     }
 
     /// Joins a new channel, leaving `channel` as-is since it's the startup value.
@@ -468,13 +467,12 @@ impl CrossCom {
         // Keep the channel string within a certain range of characters before applying it as the
         // new channel.
         let mut channel = channel.to_owned();
-        channel.truncate(12);
-        *self.current_channel.borrow_mut() = channel;
+        channel.truncate(64);
 
-        self.send_data_type(
-            DataType::UpdateChannel(self.current_channel.borrow().to_owned()),
-            None,
-        );
+        *self.current_channel.borrow_mut() = channel;
+        self.send_data_type(DataType::UpdateChannel(
+            self.current_channel.borrow().to_owned(),
+        ));
 
         if self
             .get_network_listener()
@@ -499,10 +497,11 @@ impl CrossCom {
         bearer_token: String,
         serials: Arc<Vec<String>>,
     ) -> bool {
-        self.send_data_type(
-            DataType::CheckIsSerialOK(product_id, bearer_token, (*serials).to_owned()),
-            None,
-        );
+        self.send_data_type(DataType::CheckIsSerialOK(
+            product_id,
+            bearer_token,
+            (*serials).to_owned(),
+        ));
 
         loop {
             let Some(server_message) = self.get_network_listener().wait_for_message_raw() else {

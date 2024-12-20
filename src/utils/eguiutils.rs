@@ -62,7 +62,10 @@ impl ImGuiUtils {
             .try_read()
             .unwrap_or_crash(zencstr!("[ERROR] CrossCom is locked!"))
             .get_fonts();
-        let glyph_ranges = imgui::FontGlyphRanges::from_slice(&[0xf0001, 0xf1af0, 0x1, 0x1FFFF, 0]);
+
+        // All NerdFonts glyphs included. https://github.com/ryanoasis/nerd-fonts/wiki/Glyph-Sets-and-Code-Points
+        let glyph_ranges = imgui::FontGlyphRanges::from_slice(&[0xf0001, 0xf1af0, 0x1, 0x1FFFF, 0,
+        ]);
         let (oversample_h, oversample_v) = (4, 4);
 
         ctx.fonts().add_font(&[FontSource::TtfData {
@@ -151,9 +154,9 @@ impl ImGuiUtils {
         const MAIN_DARK_GRAY: [f32; 4] = ColorUtils::rgba_to_frgba([20, 20, 20, 255]);
         const MAIN_DARKISH_GRAY: [f32; 4] = ColorUtils::rgba_to_frgba([25, 25, 25, 255]);
 
-        const RED_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 46, 0, 255]);
-        const RED_ALMOST_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 46, 0, 230]);
-        const RED_HINT: [f32; 4] = ColorUtils::rgba_to_frgba([255, 46, 0, 220]);
+        const WHITE_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 255, 255, 255]);
+        const WHITE_ALMOST_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 255, 255, 230]);
+        const WHITE_HINT: [f32; 4] = ColorUtils::rgba_to_frgba([255, 255, 255, 220]);
 
         let mut colors = style.colors;
         // Main canvas
@@ -166,30 +169,30 @@ impl ImGuiUtils {
 
         // Frame
         colors[ImGuiCol_FrameBg as usize] = MAIN_DARK_GRAY;
-        colors[ImGuiCol_FrameBgHovered as usize] = RED_ALMOST_FULL;
-        colors[ImGuiCol_FrameBgActive as usize] = RED_FULL;
+        colors[ImGuiCol_FrameBgHovered as usize] = WHITE_ALMOST_FULL;
+        colors[ImGuiCol_FrameBgActive as usize] = WHITE_FULL;
 
         // Scrollbar
-        colors[ImGuiCol_ScrollbarGrab as usize] = RED_HINT;
-        colors[ImGuiCol_ScrollbarGrabHovered as usize] = RED_ALMOST_FULL;
-        colors[ImGuiCol_ScrollbarGrabActive as usize] = RED_FULL;
+        colors[ImGuiCol_ScrollbarGrab as usize] = WHITE_HINT;
+        colors[ImGuiCol_ScrollbarGrabHovered as usize] = WHITE_ALMOST_FULL;
+        colors[ImGuiCol_ScrollbarGrabActive as usize] = WHITE_FULL;
 
         // Button
-        colors[ImGuiCol_Button as usize] = RED_HINT;
-        colors[ImGuiCol_ButtonHovered as usize] = RED_ALMOST_FULL;
-        colors[ImGuiCol_ButtonActive as usize] = RED_FULL;
+        colors[ImGuiCol_Button as usize] = WHITE_HINT;
+        colors[ImGuiCol_ButtonHovered as usize] = WHITE_ALMOST_FULL;
+        colors[ImGuiCol_ButtonActive as usize] = WHITE_FULL;
 
         // Tab
-        colors[ImGuiCol_Tab as usize] = RED_HINT;
-        colors[ImGuiCol_TabHovered as usize] = RED_ALMOST_FULL;
+        colors[ImGuiCol_Tab as usize] = WHITE_HINT;
+        colors[ImGuiCol_TabHovered as usize] = WHITE_ALMOST_FULL;
         // colors[ImGuiCol_TabActive as usize] = RED_FULL; ??
 
         // Checkmark
-        colors[ImGuiCol_CheckMark as usize] = RED_HINT;
+        colors[ImGuiCol_CheckMark as usize] = WHITE_HINT;
 
         // Slider
-        colors[ImGuiCol_SliderGrab as usize] = RED_HINT;
-        colors[ImGuiCol_SliderGrabActive as usize] = RED_ALMOST_FULL;
+        colors[ImGuiCol_SliderGrab as usize] = WHITE_HINT;
+        colors[ImGuiCol_SliderGrabActive as usize] = WHITE_ALMOST_FULL;
 
         // Resize
         colors[ImGuiCol_ResizeGrip as usize] = MAIN_DARKISH_GRAY;
@@ -197,9 +200,9 @@ impl ImGuiUtils {
         colors[ImGuiCol_ResizeGripActive as usize] = MAIN_DARK;
 
         // Drop Down
-        colors[ImGuiCol_Header as usize] = RED_HINT;
-        colors[ImGuiCol_HeaderHovered as usize] = RED_ALMOST_FULL;
-        colors[ImGuiCol_HeaderActive as usize] = RED_FULL;
+        colors[ImGuiCol_Header as usize] = WHITE_HINT;
+        colors[ImGuiCol_HeaderHovered as usize] = WHITE_ALMOST_FULL;
+        colors[ImGuiCol_HeaderActive as usize] = WHITE_FULL;
         style.colors = colors;
     }
 

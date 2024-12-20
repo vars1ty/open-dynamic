@@ -1,11 +1,10 @@
-use crate::globals::IS_PROCESSING_GIF;
 use crate::mod_cores::base_core::BaseCore;
 use crate::utils::dynwidget::SubWidgetType;
 use crate::utils::eguiutils::{CustomTexture, CustomTextureType};
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, stringutils::StringUtils};
 use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
-use hudhook::imgui::{self, Condition, TextureId, TreeNodeFlags};
+use hudhook::imgui::{self, Condition, StyleColor, TextureId, TreeNodeFlags};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{alloc::clone::TryClone, runtime::SyncFunction, Value};
@@ -304,7 +303,7 @@ impl CustomWindowsUtils {
                         callback,
                         CallbackType::Button(identifier.to_owned(), Rc::clone(opt_param)),
                     );
-                };
+                }
             }
             WidgetType::Spacing(x, y) => ui.dummy([*x, *y]),
             WidgetType::Separator => ui.separator(),
@@ -445,10 +444,13 @@ impl CustomWindowsUtils {
             .filter(|(identifier, _)| !hidden_widgets.contains(identifier));
         match sub_widget {
             SubWidgetType::CollapsingHeader(text) => {
+                let text_color = ui.push_style_color(StyleColor::Text, [0.0, 0.0, 0.0, 1.0]);
                 if !ui.collapsing_header(text, TreeNodeFlags::OPEN_ON_ARROW) {
+                    text_color.pop();
                     return;
                 }
 
+                text_color.pop();
                 for (identifier, widget) in widgets {
                     self.handle_widget(Arc::clone(&base_core), ui, identifier, widget);
                 }
@@ -481,18 +483,33 @@ impl CustomWindowsUtils {
         ));
     }
 
-    /// Changes the currently selected window.
-    pub fn set_current_window_to(&self, window: String) {
+    /// Attempts to get the index of `window` from `self.window_titles`.
+    fn get_index_for_window(&self, window: &str) -> Option<usize> {
         let Some(window_titles) = self.window_titles.try_read() else {
-            log!("[ERROR] window_titles is locked, cannot swap window focus!");
-            return;
+            log!("[ERROR] Window titles is locked, cannot call get_index_for_window!");
+            return None;
         };
 
-        let Some((index, _)) = window_titles
+        if window_titles.is_empty() {
+            log!(
+                "[ERROR] No windows have been created, cannot get index of \"",
+                window,
+                "\"!"
+            );
+            return None;
+        }
+
+        window_titles
             .iter()
             .enumerate()
             .find(|(_, window_title)| **window_title == window)
-        else {
+            .map(|(index, _)| index)
+    }
+
+    /// Changes the currently selected window.
+    pub fn set_current_window_to(&self, window: String) {
+        let Some(index) = self.get_index_for_window(&window) else {
+            log!("[ERROR] No window named \"", window, "\" was found!");
             return;
         };
 
@@ -527,24 +544,22 @@ impl CustomWindowsUtils {
 
     /// Attempts to remove a custom window.
     pub fn remove_window(&self, title: String) {
-        let Some(mut window_titles) = self.window_titles.try_write() else {
-            return;
-        };
-
         let Some(mut window_size_constraints) = self.window_size_constraints.try_lock() else {
+            log!("[ERROR] Window size constraints is locked, cannot access as mutable!");
             return;
         };
 
-        if window_titles.is_empty() {
-            log!("[ERROR] No windows are present!");
+        let Some(index) = self.get_index_for_window(&title) else {
+            log!("[ERROR] No window named \"", title, "\" was found!");
             return;
-        }
+        };
 
-        let Some((index, _)) = window_titles
-            .iter()
-            .enumerate()
-            .find(|(_, window_title)| **window_title == title)
-        else {
+        let Some(mut window_titles) = self.window_titles.try_write() else {
+            log!(
+                "[ERROR] Window titles is locked, cannot remove \"",
+                title,
+                "\"!"
+            );
             return;
         };
 
@@ -560,6 +575,13 @@ impl CustomWindowsUtils {
     /// Attempts to rename a custom window.
     pub fn rename_window(&self, from: String, to: String) {
         let Some(mut window_titles) = self.window_titles.try_write() else {
+            log!(
+                "[ERROR] Window titles is locked, cannot rename \"",
+                from,
+                "\" into \"",
+                to,
+                "\"!"
+            );
             return;
         };
 
@@ -913,13 +935,8 @@ impl CustomWindowsUtils {
     }
 
     /// Gets the Texture ID for an image. If it hasn't been cached already, then it's cached and
-    /// returned.
+    /// returned on the next call.
     pub fn get_texture_id(&self, image_path: &str, config_dir_path: &str) -> Option<TextureId> {
-        if IS_PROCESSING_GIF.load(Ordering::Relaxed) {
-            log!("[ERROR] IS_PROCESSING_GIF is true!");
-            return None;
-        }
-
         let mut full_image_path = ZString::new(String::with_capacity(
             config_dir_path.len() + image_path.len(),
         ));

@@ -162,12 +162,20 @@ macro_rules! label {
 /// Constructs a new `Button` with a constant string which uses `zencstr!()`.
 #[macro_export]
 macro_rules! button {
-    ($ui:expr, $text:literal) => {
-        $ui.button(zencstr!($text))
-    };
-    ($ui:expr, $text:expr) => {
-        $ui.button($text)
-    };
+    ($ui:expr, $text:literal) => {{
+        let text_color = $ui.push_style_color(imgui::StyleColor::Text, [0.0, 0.0, 0.0, 1.0]);
+        let result = $ui.button(zencstr!($text));
+        text_color.pop();
+
+        result
+    }};
+    ($ui:expr, $text:expr) => {{
+        let text_color = $ui.push_style_color(imgui::StyleColor::Text, [0.0, 0.0, 0.0, 1.0]);
+        let result = $ui.button($text);
+        text_color.pop();
+
+        result
+    }};
 }
 
 /// Makes a list of structure(s) thread-safe using `unsafe impl Send` and `Sync`.

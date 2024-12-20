@@ -50,39 +50,31 @@ impl Default for Config {
                 crash!(
                     "[ERROR] Failed parsing config.jsonc, error: ",
                     error,
-                    "\n[INFO] This is entirely your own fault, and not dynamics. Learn JSON!"
+                    "\n[INFO] This is entirely your own fault and not dynamics. Learn JSON!"
                 )
             })
         });
 
-        let default_cfg_serials = vec![serde_jsonc::to_value(ozencstr!("FREE-ACCESS"))
-            .unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed creating default_cfg_serials, error: ",
-                    error
-                )
-            })];
-
-        let mut cfg_serials = cached_config_ref[&zencstr!("serials").data]
+        let empty_serials = Vec::with_capacity(0);
+        let cfg_serials = cached_config_ref[&zencstr!("serials").data]
             .as_array()
             .unwrap_or_else(|| {
-                log!("[WARN] Missing serials string-array, using an empty array!");
-                &default_cfg_serials
+                log!("[WARN] Missing config.jsonc -> serials string-array, using an empty array!");
+                &empty_serials
             })
             .to_vec()
             .iter()
             .map(|serial| {
                 serial
                     .as_str()
-                    .unwrap_or_crash(zencstr!("[ERROR] ", serial, " is not a valid string!"))
+                    .unwrap_or_crash(zencstr!(
+                        "[ERROR] config.jsonc -> serials -> ",
+                        serial,
+                        " is not a valid string!"
+                    ))
                     .to_owned()
             })
             .collect::<Vec<String>>();
-
-        if cfg_serials.is_empty() {
-            log!("[WARN] No serials present, using free version!");
-            cfg_serials.push(ozencstr!("FREE-ACCESS"));
-        }
 
         Self {
             cached_config,
@@ -199,8 +191,8 @@ impl Config {
         let defined = self.get()[&zencstr!("renderer_target").data]
             .as_str()
             .unwrap_or_else(|| {
-                log!("[WARN] No renderer_target defined, using None.");
-                "None"
+                log!("[WARN] config.jsonc -> renderer_target is undefined, using None.");
+                "OpenGL"
             });
 
         match defined {
@@ -235,12 +227,12 @@ impl Config {
             .get(&zencstr!("fonts").data)?
             .as_object()
             .unwrap_or_crash(zencstr!(
-                "[ERROR] \"fonts\" couldn't be turned into an object!"
+                "[ERROR] config.jsonc -> fonts couldn't be turned into an object!"
             ))
         {
             let Some(font_size) = font_size.as_u64() else {
                 log!(
-                    "[ERROR] Font Size of font at ",
+                    "[ERROR] Font Size of font at config.jsonc -> fonts -> ",
                     relative_font_path,
                     " isn't a valid u64 and will therefore not be added!"
                 );
@@ -284,5 +276,26 @@ impl Config {
         self.get()[&zencstr!("use_new_rune_thread").data]
             .as_bool()
             .unwrap_or(true)
+    }
+
+    /// If `Some()`, the `startup_channel` string is returned from the config.
+    /// If not, or the value wasn't a string - it returns `None`.
+    pub fn get_startup_channel(&self) -> Option<String> {
+        if let Some(channel) = self.get()[&zencstr!("startup_channel").data].as_str() {
+            if !channel.starts_with('#') || channel.contains(' ') || channel.len() < 4 {
+                log!("[ERROR] config.jsonc -> startup_channel must start with #, contain no whitespaces, no longer than 3 characters, using random channel!");
+                return None;
+            }
+
+            let mut channel = channel.to_owned();
+            if channel.len() > 64 {
+                log!("[WARN] config.jsonc -> startup_channel was longer than 64 character, shortened to 64 characters!");
+                channel.truncate(64);
+            }
+
+            return Some(channel);
+        }
+
+        None
     }
 }

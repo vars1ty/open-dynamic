@@ -1,5 +1,5 @@
 use crate::{
-    globals::{DELTA_TIME, IS_CURSOR_IN_UI, IS_PROCESSING_GIF},
+    globals::{DELTA_TIME, IS_CURSOR_IN_UI},
     mod_cores::base_core::BaseCore,
     ui::community::CommunityWindow,
     utils::{
@@ -220,9 +220,7 @@ impl DX11UI {
         }
 
         if let Some(image_path) = gif_image_path.take() {
-            IS_PROCESSING_GIF.store(true, Ordering::Relaxed);
             self.load_gif_frames(&image_path, &mut cached_textures, render_context);
-            IS_PROCESSING_GIF.store(false, Ordering::Relaxed);
         }
 
         for invalid_texture in &self.invalid_textures {
@@ -366,8 +364,7 @@ impl ImguiRenderLoop for DX11UI {
             });
 
         ui.window(zencstr!("󰡉 Community"))
-            .size([1280.0, 600.0], Condition::FirstUseEver)
-            .size_constraints([1280.0, 200.0], [f32::INFINITY, f32::INFINITY])
+            .size([300.0, 100.0], Condition::FirstUseEver)
             .collapsed(true, Condition::Once)
             .build(|| {
                 if let Some(community_window) = self.community_window.get_mut() {

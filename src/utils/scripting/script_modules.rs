@@ -201,11 +201,12 @@ impl SystemModules {
             .build()?;
 
         let serials_clone = Arc::clone(&serials);
+        let crosscom_clone = Arc::clone(&crosscom);
         sellix_module
             .function(
                 "is_paying_for_product",
                 move |product_id: String, bearer_token: String| {
-                    crosscom.read().check_is_ex_serial_ok(
+                    crosscom_clone.read().check_is_ex_serial_ok(
                         product_id,
                         bearer_token,
                         Arc::clone(&serials_clone),
@@ -326,6 +327,18 @@ impl SystemModules {
             .build()?;
         std_module
             .function("f64_approx_eq", |value: f64, compare: f64| value == compare)
+            .build()?;
+
+        let crosscom_clone = Arc::clone(&crosscom);
+        std_module
+            .function("send_script_to_group", move |source: &str| {
+                crosscom_clone
+                    .try_read()
+                    .unwrap_or_crash(zencstr!(
+                        "[ERROR] Crosscom is locked, cannot call std::send_script_to_group!"
+                    ))
+                    .send_script(source);
+            })
             .build()?;
 
         Ok(vec![
@@ -805,7 +818,7 @@ impl UIModules {
                             false,
                             Self::function_into_sync(callback, identifier),
                             Rc::new(opt_param),
-                            false
+                            false,
                         ),
                     )
                 },
@@ -826,7 +839,7 @@ impl UIModules {
                             false,
                             Self::function_into_sync(callback, identifier),
                             Rc::new(opt_param),
-                            false
+                            false,
                         ),
                     )
                 },
@@ -847,7 +860,7 @@ impl UIModules {
                             true,
                             Self::function_into_sync(Function::new(|| {}), identifier),
                             Rc::new(None),
-                            false
+                            false,
                         ),
                     )
                 },
@@ -967,12 +980,6 @@ impl UIModules {
                     )
                 },
             )
-            .build()?;
-
-        module
-            .function("is_processing_gif", || {
-                IS_PROCESSING_GIF.load(Ordering::Relaxed)
-            })
             .build()?;
 
         Ok(module)

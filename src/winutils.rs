@@ -431,6 +431,9 @@ impl WinUtils {
             "Up" => 0x26,
             "Down" => 0x28,
             "Shift" => 0x10,
+            "LMButton" => 0x01,
+            "RMButton" => 0x02,
+            "MMButton" => 0x04,
             _ => 0,
         };
 

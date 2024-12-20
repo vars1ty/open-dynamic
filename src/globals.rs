@@ -2,15 +2,13 @@ use crate::winutils::WinUtils;
 use ahash::AHashMap;
 use atomic_float::AtomicF32;
 use parking_lot::Mutex;
-use std::sync::{atomic::AtomicBool, LazyLock, OnceLock};
+use std::sync::{atomic::AtomicBool, LazyLock};
 use windows::Win32::System::Diagnostics::ToolHelp::MODULEENTRY32;
 use zstring::ZString;
 
 /// Safe wrapper around MODULEENTRY32.
 pub struct SafeMODULEENTRY32(pub MODULEENTRY32);
 thread_safe_structs!(SafeMODULEENTRY32);
-
-pub static IS_PROCESSING_GIF: AtomicBool = AtomicBool::new(false);
 
 /// Cached process modules.
 pub static MODULES: LazyLock<AHashMap<String, SafeMODULEENTRY32>> =

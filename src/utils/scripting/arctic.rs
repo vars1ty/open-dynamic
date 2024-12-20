@@ -256,7 +256,6 @@ impl Arctic {
             injected_dlls,
         };
 
-        instance.link_script_received();
         instance
     }
 
@@ -341,44 +340,6 @@ impl Arctic {
         &self,
     ) -> Arc<DashMap<ProcessModule<BorrowedProcess<'static>>, String>> {
         Arc::clone(&self.injected_dlls)
-    }
-
-    /// Hooks script/source received events from CrossCom with a function that calls `on_script_received` on all injected DLLs once received.
-    fn link_script_received(&self) {
-        let Some(reader) = self.base_core.try_read() else {
-            log!("[ERROR] Can't access BaseCore for Arctic::link_script_received!");
-            return;
-        };
-
-        let crosscom_clone_reader = reader.get_crosscom();
-        let crosscom = reader.get_crosscom();
-        let Some(reader) = crosscom_clone_reader.try_read() else {
-            log!("[ERROR] Can't access CrossCom for Arctic::link_script_received!");
-            return;
-        };
-
-        let injected_dlls = self.get_injected_dlls();
-        reader
-            .get_network_listener()
-            .hook_on_script_received(crosscom, move |source| {
-                Self::call_on_script_received(&injected_dlls, source);
-            });
-    }
-
-    /// Calls `on_script_received` on all plugins with the specified source.
-    fn call_on_script_received(
-        injected_dlls: &Arc<DashMap<ProcessModule<BorrowedProcess<'static>>, String>>,
-        mut source: String,
-    ) {
-        for module_name in &**injected_dlls {
-            if let Some(func) =
-                WinUtils::get_module_symbol_address(&*module_name, c"on_script_received")
-            {
-                unsafe {
-                    std::mem::transmute::<usize, fn(String)>(func)(std::mem::take(&mut source));
-                }
-            }
-        }
     }
 
     /// Checks if a gateway/plugin is currently active.
