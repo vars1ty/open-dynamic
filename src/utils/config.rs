@@ -79,11 +79,13 @@ impl Default for Config {
             cached_config_ref[&zencstr!("collect_params_count").data].as_u64()
         {
             COLLECT_PARAMS_COUNT.store(collect_params_count as usize, Ordering::Relaxed);
-            log!(
-                "[Config]: RDetours will now collect collect ",
-                collect_params_count,
-                " parameters, instead of the default 10!"
-            );
+            if collect_params_count != 10 {
+                log!(
+                    "[Config]: RDetours will now collect collect ",
+                    collect_params_count,
+                    " parameters, instead of the default 10!"
+                );
+            }
         }
 
         Self {
