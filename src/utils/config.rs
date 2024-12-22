@@ -4,17 +4,16 @@ use crate::{
 };
 use serde_jsonc::Value;
 use std::{
-    cell::OnceCell,
     fmt::Display,
     fs::read_to_string,
     io::{Result, Write},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 /// Simple JSON config.
 pub struct Config {
     /// Cached config.
-    cached_config: OnceCell<Value>,
+    cached_config: OnceLock<Value>,
 
     /// Directory path.
     path: &'static str,
@@ -22,8 +21,6 @@ pub struct Config {
     /// Custom product serials.
     serials: Arc<Vec<String>>,
 }
-
-thread_safe_structs!(Config);
 
 impl Default for Config {
     /// Returns a default pre-configured instance of `Config`, should only be used once and be
@@ -44,7 +41,7 @@ impl Default for Config {
         });
         drop(path);
 
-        let cached_config: OnceCell<Value> = OnceCell::new();
+        let cached_config: OnceLock<Value> = OnceLock::new();
         let cached_config_ref = cached_config.get_or_init(|| {
             serde_jsonc::from_str(&config_content).unwrap_or_else(|error| {
                 crash!(
