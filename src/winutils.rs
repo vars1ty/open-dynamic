@@ -369,7 +369,7 @@ impl WinUtils {
     /// This should be relatively safe due to the usage of `OnceLock` and `Mutex<ZString>`.
     #[optimize(size)]
     pub fn log_message(mut message: ZString, new_line: bool) {
-        let Some(mut logged_messages) = LOGGED_MESSAGES.try_lock() else {
+        let Ok(mut logged_messages) = LOGGED_MESSAGES.try_borrow_mut() else {
             return;
         };
 

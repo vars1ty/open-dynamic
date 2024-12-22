@@ -1,7 +1,7 @@
 use crate::winutils::WinUtils;
 use ahash::AHashMap;
 use atomic_float::AtomicF32;
-use parking_lot::Mutex;
+use atomic_refcell::AtomicRefCell;
 use std::sync::{atomic::AtomicBool, LazyLock};
 use windows::Win32::System::Diagnostics::ToolHelp::MODULEENTRY32;
 use zstring::ZString;
@@ -15,7 +15,7 @@ pub static MODULES: LazyLock<AHashMap<String, SafeMODULEENTRY32>> =
     LazyLock::new(WinUtils::get_modules_no_cache);
 
 /// Logged screen (and stdout) messages.
-pub static LOGGED_MESSAGES: LazyLock<Mutex<ZString>> = LazyLock::new(Default::default);
+pub static LOGGED_MESSAGES: LazyLock<AtomicRefCell<ZString>> = LazyLock::new(Default::default);
 
 /// Last-set delta time.
 pub static DELTA_TIME: AtomicF32 = AtomicF32::new(0.0);

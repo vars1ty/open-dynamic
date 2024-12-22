@@ -88,66 +88,6 @@ macro_rules! crash {
     };
 }
 
-/// Quicker way of defining macros, mainly intended as a C++-like replacement for #define.
-#[macro_export]
-macro_rules! define {
-    ($name:ident, $data:literal) => {
-        macro_rules! $name {
-            () => {
-                $data
-            };
-        }
-    };
-    ($name:ident, $data:expr) => {
-        macro_rules! $name {
-            () => {
-                $data
-            };
-        }
-    };
-}
-
-/// Enables a hook.
-#[macro_export]
-macro_rules! enable_hook {
-    ($hook:expr, $fn_address:expr, $callback:expr, $hook_name:literal) => {
-        std::thread::spawn(move || unsafe {
-            #[allow(clippy::missing_transmute_annotations)]
-            let hook = $hook.initialize(std::mem::transmute($fn_address), $callback);
-            if let Ok(hook) = hook {
-                if let Err(error) = hook.enable() {
-                    log!(
-                        "[ERROR] Failed enabling hook ",
-                        $hook_name,
-                        ", error: ",
-                        error
-                    );
-                } else {
-                    log!("Hook ", $hook_name, " loaded successfully!");
-                }
-            } else {
-                log!(
-                    "[ERROR] Failed initializing hook ",
-                    $hook_name,
-                    ", error: ",
-                    hook.unwrap_err_unchecked()
-                );
-            }
-        })
-    };
-}
-
-/// Fills the memory-space at a specific location with `data.len()` amount of bytes.
-#[macro_export]
-macro_rules! zero {
-    ($data:expr) => {{
-        unsafe { std::ptr::write_bytes($data.as_ptr() as *mut u8, 0u8, $data.len()) }
-    }};
-    ($data:expr, $amount:expr) => {{
-        unsafe { std::ptr::write_bytes($data.as_ptr() as *mut u8, 0u8, $amount) }
-    }};
-}
-
 /// Constructs a new `Label`. If the string is literal/constant, it'll be using `zencstr!()`.
 #[macro_export]
 macro_rules! label {

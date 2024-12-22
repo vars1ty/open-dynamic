@@ -63,9 +63,8 @@ impl ImGuiUtils {
             .unwrap_or_crash(zencstr!("[ERROR] CrossCom is locked!"))
             .get_fonts();
 
-        // All NerdFonts glyphs included. https://github.com/ryanoasis/nerd-fonts/wiki/Glyph-Sets-and-Code-Points
-        let glyph_ranges = imgui::FontGlyphRanges::from_slice(&[0xf0001, 0xf1af0, 0x1, 0x1FFFF, 0,
-        ]);
+        // https://github.com/ryanoasis/nerd-fonts/wiki/Glyph-Sets-and-Code-Points
+        let glyph_ranges = imgui::FontGlyphRanges::from_slice(&[0xf0001, 0xf1af0, 0x1, 0x1FFFF, 0]);
         let (oversample_h, oversample_v) = (4, 4);
 
         ctx.fonts().add_font(&[FontSource::TtfData {
@@ -112,7 +111,12 @@ impl ImGuiUtils {
                 data: &config
                     .get_file_content_bytes(relative_font_path)
                     .unwrap_or_else(|error| {
-                        crash!("[ERROR] Failed reading font data, error: ", error)
+                        crash!(
+                            "[ERROR] Failed reading Font Data from config.jsonc -> fonts -> ",
+                            relative_font_path,
+                            ", error: ",
+                            error
+                        )
                     }),
                 size_pixels: font_size,
                 config: Some(imgui::FontConfig {
@@ -124,7 +128,7 @@ impl ImGuiUtils {
             }]);
 
             log!(
-                "[FONTS] Installed font from relative path \"",
+                "[FONTS] Installed Font from relative path \"",
                 relative_font_path,
                 "\", size: ",
                 font_size,
@@ -185,7 +189,6 @@ impl ImGuiUtils {
         // Tab
         colors[ImGuiCol_Tab as usize] = WHITE_HINT;
         colors[ImGuiCol_TabHovered as usize] = WHITE_ALMOST_FULL;
-        // colors[ImGuiCol_TabActive as usize] = RED_FULL; ??
 
         // Checkmark
         colors[ImGuiCol_CheckMark as usize] = WHITE_HINT;
@@ -265,7 +268,7 @@ impl ImGuiUtils {
             .fonts
             .get(&relative_font_path)
             .unwrap_or_crash(zencstr!(
-                "[ERROR] No font has been instantiated with the relative path of \"",
+                "[ERROR] No Font has been instantiated with the relative path of \"",
                 relative_font_path,
                 "\"!"
             ))
@@ -277,7 +280,7 @@ impl ImGuiUtils {
             return;
         }
 
-        let Some(logged_messages) = LOGGED_MESSAGES.try_lock() else {
+        let Ok(logged_messages) = LOGGED_MESSAGES.try_borrow() else {
             return;
         };
 
@@ -428,7 +431,7 @@ impl ImGuiUtils {
         ui.set_clipboard_text(text);
     }
 
-    /// Extracts the frames of a GIF into a `Vec<Frame>`.
+    /// Extracts the frames of a GIF into a `Vec<gif::Frame>`.
     pub fn extract_gif_frames(path: &str) -> Vec<gif::Frame> {
         let input = File::open(path)
             .unwrap_or_else(|error| crash!("[ERROR] Failed opening GIF, error: ", error));

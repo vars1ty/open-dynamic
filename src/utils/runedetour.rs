@@ -22,7 +22,7 @@ macro_rules! generate_detour_id {
         });
 
         let mut collected_args = Vec::with_capacity(10);
-        for _ in 0..=10 {
+        for _ in 0..=collected_args.capacity() {
             collected_args.push(unsafe { $args.arg::<*mut i64>() } as i64);
         }
 
@@ -339,18 +339,18 @@ impl RDetour {
             return false;
         };
 
-        if detour.is_enabled() {
-            if let Err(error) = unsafe { detour.disable() } {
-                log!(
-                    "[ERROR] Failed disabling RDetour at ID ",
-                    rdetour.get_detour_id(),
-                    ", address ",
-                    format!("{address:?}"),
-                    ", error: ",
-                    error
-                );
-                return false;
-            }
+        if detour.is_enabled()
+            && let Err(error) = unsafe { detour.disable() }
+        {
+            log!(
+                "[ERROR] Failed disabling RDetour at ID ",
+                rdetour.get_detour_id(),
+                ", address ",
+                format!("{address:?}"),
+                ", error: ",
+                error
+            );
+            return false;
         }
 
         rdetour.from_ptr = None;

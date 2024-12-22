@@ -77,7 +77,7 @@ impl CommunityWindow {
                     return;
                 };
 
-                label!(ui, "Community Rune Submissions");
+                label!(ui, "󰡉 Community Submissions");
                 font.pop();
             },
         );
@@ -102,7 +102,7 @@ impl CommunityWindow {
     /// Draws the inner content of a community item.
     fn draw_inner_frame_content(&self, ui: &imgui::Ui, item_data: &CommunityItem) {
         label!(ui, &item_data.summary);
-        if ui.button(zencstr!("Execute ", &item_data.name)) {
+        if button!(ui, zencstr!("󱐋 Execute ", &item_data.name)) {
             let Some(base_core_reader) = self.base_core.try_read() else {
                 return;
             };

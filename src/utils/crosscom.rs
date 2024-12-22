@@ -521,7 +521,7 @@ impl CrossCom {
     }
 
     /// Gets the current channel. Do **not** modify it as-is, use `join_channel`!
-    pub fn get_current_channel(&self) -> &RefCell<String> {
+    pub const fn get_current_channel(&self) -> &RefCell<String> {
         &self.current_channel
     }
 
