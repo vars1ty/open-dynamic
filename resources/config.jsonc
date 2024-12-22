@@ -10,10 +10,22 @@
     // Uncomment to override, leave commented to use a random channel.
     // "startup_channel": "",
 
-    /// Header Font Size, by default its 26.
+    // Amount of parameters to collect from a hooked function when it's been called.
+    // Note that this doesn't check if the value is actually outside of the total
+    // amount of parameters a function has got. If it has only 3 and this is 10,
+    // then it will outside of the va_args list and return data from unknown addresses.
+    //
+    // This value does nothing on x86 as RDetours aren't properly functional on it, due
+    // to the forced usage of va_args.
+    // Default Value: 10
+    "collect_params_count": 10,
+
+    /// Header Font Size.
+    /// Default Value: 26
     "header_font_size": 26,
 
-    /// Main Font Size, by default its 18.
+    /// Main Font Size.
+    /// Default Value: 18
     "main_font_size": 18,
 
     // Free ("hide") the console when injected?
@@ -21,17 +33,15 @@
     // Default Value: false
     "free_console": false,
 
-    // Serials for products, one string per entry.
-    // The first serial HAS to be your dynamic serial, starting
-    // with DNX-[...]/NDNX-[...]/PDNX-[...], otherwise dynamic won't verify you.
-    // ## CRITICAL: Do NOT EVER share any of the values inside of this array.
-    // ## They are reserved for you and only you.
+    // Serials for Sellix products, one string per entry.
     // Default Value: Empty
     "serials": [],
 
     // Custom fonts that dynamic should load.
     // Each item in the fonts object should be like: "relative_font_path.extension": font_size_u64
     // For example: "Comfortaa.ttf": 12
+    //
+    // Each font can be activated on-demand in the UI Builder in labels.
     // Default Value: Empty
     "fonts": {}
 }

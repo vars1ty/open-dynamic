@@ -3,13 +3,14 @@ use crate::{
     mod_cores::base_core::BaseCore,
     ui::community::CommunityWindow,
     utils::{
+        colorutils::ColorUtils,
         eguiutils::{CustomTexture, CustomTextureType, ImGuiUtils},
         extensions::OptionExt,
     },
     winutils::WinUtils,
 };
 use hudhook::{
-    imgui::{self, Condition, Context},
+    imgui::{self, Condition, Context, Style, StyleColor, TreeNodeFlags},
     ImguiRenderLoop, RenderContext,
 };
 use parking_lot::RwLock;
@@ -47,6 +48,9 @@ pub struct DX11UI {
 
     /// Invalid textures that should be removed the next frame.
     invalid_textures: Vec<String>,
+
+    /// Default dynamic ImGui style.
+    default_style: Style,
 }
 
 impl DX11UI {
@@ -81,6 +85,7 @@ impl DX11UI {
             can_toggle_ui: true,
             crosscom_channel,
             invalid_textures: Vec::with_capacity(4),
+            default_style: Style::default(),
         }
     }
 
@@ -102,14 +107,14 @@ impl DX11UI {
 
     /// Draws Save and Load management.
     fn draw_script_management(&mut self, ui: &imgui::Ui) {
-        ui.input_text(zencstr!("Script Name"), &mut self.script_name)
+        ui.input_text(zencstr!("󰈞 Script Name"), &mut self.script_name)
             .build();
 
         if self.script_name.is_empty() {
             return;
         }
 
-        if button!(ui, "Save Rune Script") {
+        if button!(ui, "󰈝 Save Rune Script") {
             self.base_core
                 .read()
                 .get_config()
@@ -117,7 +122,7 @@ impl DX11UI {
         }
 
         ui.same_line();
-        if button!(ui, "Load Rune Script")
+        if button!(ui, "󱇧 Load Rune Script")
             && self
                 .base_core
                 .read()
@@ -176,14 +181,14 @@ impl DX11UI {
 
             match texture_type {
                 CustomTextureType::Gif => {
-                    log!("Texture Loader: Attempting to load GIF texture...");
+                    log!("[Texture Loader]: Attempting to load GIF texture...");
 
                     // Save path for after this for-loop, as otherwise we risk deadlocks due to
                     // held-on resources.
                     gif_image_path = Some(image_path);
                 }
                 CustomTextureType::GifFrame => {
-                    crash!("[ERROR] Attempted processing CustomTextureType::GifFrame, evading the filter!");
+                    crash!("[ERROR] Attempted processing CustomTextureType::GifFrame, escaping the filter!");
                 }
                 CustomTextureType::Singular => {
                     let image = image::open(&image_path);
@@ -220,7 +225,7 @@ impl DX11UI {
         }
 
         if let Some(image_path) = gif_image_path.take() {
-            self.load_gif_frames(&image_path, &mut cached_textures, render_context);
+            self.load_gif_frames(image_path, &mut cached_textures, render_context);
         }
 
         for invalid_texture in &self.invalid_textures {
@@ -230,22 +235,25 @@ impl DX11UI {
         self.invalid_textures.clear();
     }
 
-    /// Loads the frame of a GIF into the GPU and stores them as `image_path.[frame_number]`.
+    /// Loads the frame of a GIF into the GPU and stores them as `image_path.frame_[frame_number]`.
     fn load_gif_frames(
         &mut self,
-        image_path: &str,
+        image_path: String,
         cached_images: &mut HashMap<String, CustomTexture>,
         render_context: &mut dyn RenderContext,
     ) {
-        let extracted_frames = ImGuiUtils::extract_gif_frames(image_path);
+        let extracted_frames = ImGuiUtils::extract_gif_frames(&image_path);
         for (i, frame) in extracted_frames.iter().enumerate() {
+            let i = i + 1; // Make the index be more human-readable and not count from 0 when
+                           // displaying.
+
             let loaded_texture_id =
                 render_context.load_texture(&frame.buffer, frame.width as u32, frame.height as u32);
             let Ok(loaded_texture_id) = loaded_texture_id else {
                 log!(
-                    "[ERROR] Failed loading image at path \"",
+                    "[ERROR] Failed uploading image at path \"",
                     image_path,
-                    "\" into the GPU, frame: ",
+                    "\" to the GPU, frame ",
                     i,
                     ", error: ",
                     loaded_texture_id.unwrap_err()
@@ -254,7 +262,10 @@ impl DX11UI {
                 return;
             };
 
-            if i == 0 {
+            if i == 1 {
+                // Not an elegant solution, the ideal way would be to remove the image_path entry,
+                // in order to not keep 2 entries with the same resource (image_path & first
+                // frame).
                 cached_images.insert(
                     image_path.to_owned(),
                     CustomTexture {
@@ -265,7 +276,12 @@ impl DX11UI {
             }
 
             let frame_path = ozencstr!(image_path, ".frame_", i);
-            log!("Texture Loader: Loaded frame ", i, " at path: ", frame_path);
+            log!(
+                "[Texture Loader]: Loaded frame ",
+                i,
+                ", ready at in-memory path: ",
+                frame_path
+            );
             cached_images.insert(
                 frame_path,
                 CustomTexture {
@@ -276,7 +292,7 @@ impl DX11UI {
         }
 
         log!(
-            "Texture Loader: GIF frames loaded from \"",
+            "[Texture Loader]: GIF frames loaded from \"",
             image_path,
             "\", frames: ",
             extracted_frames.len(),
@@ -300,6 +316,7 @@ impl ImguiRenderLoop for DX11UI {
 
         imgui_utils_reader.apply_style(
             ctx,
+            &mut self.default_style,
             base_core_reader.get_config(),
             base_core_reader.get_crosscom(),
         )
@@ -315,7 +332,7 @@ impl ImguiRenderLoop for DX11UI {
     }
 
     /// Renders the UI.
-    fn render<'a>(&mut self, ui: &mut imgui::Ui, _render_context: &'a mut dyn RenderContext) {
+    fn render(&mut self, ui: &mut imgui::Ui, _render_context: &mut dyn RenderContext) {
         DELTA_TIME.store(ui.io().delta_time, Ordering::SeqCst);
         self.load_unitialized_textures(_render_context);
         ImGuiUtils::sync_clipboard(ui);
@@ -355,7 +372,7 @@ impl ImguiRenderLoop for DX11UI {
                     [available_size[0], available_size[1] - FREE_SPACE_FOR_BUTTON],
                 )
                 .build();
-                if button!(ui, "Execute") {
+                if button!(ui, "󱐋 Execute") {
                     self.execute_rune_code();
                 }
 
@@ -385,27 +402,48 @@ impl ImguiRenderLoop for DX11UI {
                     return;
                 };
 
-                ui.input_text(zencstr!("󰷔 CrossCom Channel"), &mut self.crosscom_channel)
-                    .build();
-                ui.checkbox(
-                    zencstr!("󰵅 Enable Side Messages"),
-                    &mut imgui_utils_writer.enable_side_messages,
-                );
-                drop(imgui_utils_writer);
-                ui.separator();
+                let text_color = ui.push_style_color(StyleColor::Text, [0.0, 0.0, 0.0, 1.0]);
+                if ui.collapsing_header(zencstr!("󱁤 System"), TreeNodeFlags::OPEN_ON_ARROW) {
+                    text_color.pop();
 
-                if ui.button(zencstr!("󱘖 Join Channel")) {
-                    self.base_core
-                        .try_read()
-                        .unwrap_or_crash(zencstr!(
-                            "[ERROR] Failed reading BaseCore, cannot continue!"
-                        ))
-                        .get_crosscom()
-                        .try_read()
-                        .unwrap_or_crash(zencstr!(
-                            "[ERROR] Failed reading CrossCom, cannot continue!"
-                        ))
-                        .join_channel(&self.crosscom_channel);
+                    ui.input_text(zencstr!("󰷔 CrossCom Channel"), &mut self.crosscom_channel)
+                        .build();
+                    ui.checkbox(
+                        zencstr!("󰵅 Enable Side Messages"),
+                        &mut imgui_utils_writer.enable_side_messages,
+                    );
+                    drop(imgui_utils_writer);
+                    ui.separator();
+
+                    if ui.button(zencstr!("󱘖 Join Channel")) {
+                        self.base_core
+                            .try_read()
+                            .unwrap_or_crash(zencstr!(
+                                "[ERROR] Failed reading BaseCore, cannot continue!"
+                            ))
+                            .get_crosscom()
+                            .try_read()
+                            .unwrap_or_crash(zencstr!(
+                                "[ERROR] Failed reading CrossCom, cannot continue!"
+                            ))
+                            .join_channel(&self.crosscom_channel);
+                    }
+                } else {
+                    text_color.pop();
+                }
+
+                let text_color = ui.push_style_color(StyleColor::Text, [0.0, 0.0, 0.0, 1.0]);
+                if ui.collapsing_header(zencstr!("󰉼 Colors"), TreeNodeFlags::OPEN_ON_ARROW) {
+                    text_color.pop();
+
+                    let text_color = ui.push_style_color(StyleColor::Text, ColorUtils::rgba_to_frgba([255, 105, 0, 255]));
+                    label!(ui, "󱇎 Warning: Text Color on buttons and alike isn't directly derived from the UI Stylesheet, and is instead programmed into dynamic.");
+                    label!(ui, "󱇎 Warning: Save and Load isn't yet implemented, this is just a preview and lack features.");
+                    text_color.pop();
+
+                    ui.show_style_editor(&mut self.default_style);
+                } else {
+                    text_color.pop();
                 }
 
                 ImGuiUtils::render_software_cursor(ui, &mut self.point);

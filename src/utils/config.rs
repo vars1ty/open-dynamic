@@ -7,8 +7,10 @@ use std::{
     fmt::Display,
     fs::read_to_string,
     io::{Result, Write},
-    sync::{Arc, OnceLock},
+    sync::{atomic::Ordering, Arc, OnceLock},
 };
+
+use super::runedetour::COLLECT_PARAMS_COUNT;
 
 /// Simple JSON config.
 pub struct Config {
@@ -72,6 +74,17 @@ impl Default for Config {
                     .to_owned()
             })
             .collect::<Vec<String>>();
+
+        if let Some(collect_params_count) =
+            cached_config_ref[&zencstr!("collect_params_count").data].as_u64()
+        {
+            COLLECT_PARAMS_COUNT.store(collect_params_count as usize, Ordering::Relaxed);
+            log!(
+                "[Config]: RDetours will now collect collect ",
+                collect_params_count,
+                " parameters, instead of the default 10!"
+            );
+        }
 
         Self {
             cached_config,
@@ -188,7 +201,7 @@ impl Config {
         let defined = self.get()[&zencstr!("renderer_target").data]
             .as_str()
             .unwrap_or_else(|| {
-                log!("[WARN] config.jsonc -> renderer_target is undefined, using None.");
+                log!("[WARN] config.jsonc -> renderer_target couldn't be turned into a string, using OpenGL.");
                 "OpenGL"
             });
 
@@ -280,7 +293,7 @@ impl Config {
     pub fn get_startup_channel(&self) -> Option<String> {
         if let Some(channel) = self.get()[&zencstr!("startup_channel").data].as_str() {
             if !channel.starts_with('#') || channel.contains(' ') || channel.len() < 4 {
-                log!("[ERROR] config.jsonc -> startup_channel must start with #, contain no whitespaces, no longer than 3 characters, using random channel!");
+                log!("[ERROR] config.jsonc -> startup_channel must start with #, contain no whitespaces and be no longer than 3 characters. Using random channel!");
                 return None;
             }
 

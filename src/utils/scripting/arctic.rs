@@ -343,7 +343,7 @@ impl Arctic {
     }
 
     /// Checks if a gateway/plugin is currently active.
-    pub fn is_gateway_active(&self, identifier: String) -> bool {
+    pub fn is_gateway_active(&self, identifier: &str) -> bool {
         self.get_injected_dlls()
             .iter()
             .any(|module_name| *module_name == identifier)

@@ -60,7 +60,9 @@ impl ImGuiUtils {
     ) {
         let (normal_font_bytes, bold_font_bytes) = crosscom
             .try_read()
-            .unwrap_or_crash(zencstr!("[ERROR] CrossCom is locked!"))
+            .unwrap_or_crash(zencstr!(
+                "[ERROR] CrossCom is locked, fonts can't be loaded from server!"
+            ))
             .get_fonts();
 
         // https://github.com/ryanoasis/nerd-fonts/wiki/Glyph-Sets-and-Code-Points
@@ -145,6 +147,7 @@ impl ImGuiUtils {
     pub fn apply_style(
         &self,
         ctx: &mut imgui::Context,
+        default_style: &mut Style,
         config: &Config,
         crosscom: Arc<RwLock<CrossCom>>,
     ) {
@@ -161,6 +164,7 @@ impl ImGuiUtils {
         const WHITE_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 255, 255, 255]);
         const WHITE_ALMOST_FULL: [f32; 4] = ColorUtils::rgba_to_frgba([255, 255, 255, 230]);
         const WHITE_HINT: [f32; 4] = ColorUtils::rgba_to_frgba([255, 255, 255, 220]);
+        const WHITE_SLIGHT_HINT: [f32; 4] = ColorUtils::rgba_to_frgba([255, 255, 255, 200]);
 
         let mut colors = style.colors;
         // Main canvas
@@ -173,8 +177,8 @@ impl ImGuiUtils {
 
         // Frame
         colors[ImGuiCol_FrameBg as usize] = MAIN_DARK_GRAY;
-        colors[ImGuiCol_FrameBgHovered as usize] = WHITE_ALMOST_FULL;
-        colors[ImGuiCol_FrameBgActive as usize] = WHITE_FULL;
+        colors[ImGuiCol_FrameBgHovered as usize] = WHITE_HINT;
+        colors[ImGuiCol_FrameBgActive as usize] = WHITE_SLIGHT_HINT;
 
         // Scrollbar
         colors[ImGuiCol_ScrollbarGrab as usize] = WHITE_HINT;
@@ -195,7 +199,7 @@ impl ImGuiUtils {
 
         // Slider
         colors[ImGuiCol_SliderGrab as usize] = WHITE_HINT;
-        colors[ImGuiCol_SliderGrabActive as usize] = WHITE_ALMOST_FULL;
+        colors[ImGuiCol_SliderGrabActive as usize] = WHITE_SLIGHT_HINT;
 
         // Resize
         colors[ImGuiCol_ResizeGrip as usize] = MAIN_DARKISH_GRAY;
@@ -206,7 +210,9 @@ impl ImGuiUtils {
         colors[ImGuiCol_Header as usize] = WHITE_HINT;
         colors[ImGuiCol_HeaderHovered as usize] = WHITE_ALMOST_FULL;
         colors[ImGuiCol_HeaderActive as usize] = WHITE_FULL;
+
         style.colors = colors;
+        *default_style = *style;
     }
 
     /// Draws a virtual software cursor.

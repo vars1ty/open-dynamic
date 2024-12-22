@@ -122,7 +122,6 @@ fn hook(hmodule: isize) {
 /// Prepares the hooking process and calls `hook_based_on_renderer`.
 fn prepare_hooks(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
     log!("Hooking into unknown process, proceed at your own risk!");
-    log!("HMODULE at ", format!("{:?}", hmodule as *const i64));
     hook_based_on_renderer(Arc::clone(&base_core), hmodule);
 }
 

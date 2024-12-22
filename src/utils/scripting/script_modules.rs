@@ -68,7 +68,7 @@ impl SystemModules {
         module.ty::<AddressType>()?;
 
         dynamic_module
-            .function("log", |data: String| {
+            .function("log", |data: &str| {
                 log!(data);
             })
             .build()?;
@@ -136,19 +136,19 @@ impl SystemModules {
             .function("get_cursor_xy", Self::get_cursor_xy)
             .build()?;
         windows_module
-            .function("show_alert", |caption: String, text: String| {
-                WinUtils::display_message_box(&caption, &text, 0x00000010)
+            .function("show_alert", |caption: &str, text: &str| {
+                WinUtils::display_message_box(caption, text, 0x00000010)
             })
             .build()?;
         windows_module
-            .function("get_base_of_module", |module_name: String| {
-                WinUtils::get_base_of(&module_name) as i64
+            .function("get_base_of_module", |module_name: &str| {
+                WinUtils::get_base_of(module_name) as i64
             })
             .build()?;
         windows_module
             .function(
                 "get_address_of_symbol",
-                |module_name: String, symbol: String| {
+                |module_name: &str, symbol: &str| {
                     WinUtils::get_module_symbol_address(
                         module_name,
                         &CString::new(symbol).unwrap_or_else(|error| {
@@ -236,7 +236,7 @@ impl SystemModules {
 
         let base_core_clone = Arc::clone(&base_core);
         arctic_module
-            .function("is_plugin_active", move |identifier| {
+            .function("is_plugin_active", move |identifier: &str| {
                 base_core_clone
                     .read()
                     .get_arctic_core()
@@ -249,7 +249,7 @@ impl SystemModules {
             .build()?;
 
         std_module
-            .function("get_lines_from_string", |input: String| {
+            .function("get_lines_from_string", |input: &str| {
                 input
                     .lines()
                     .map(|line| line.to_owned())
@@ -266,14 +266,14 @@ impl SystemModules {
             .build()?;
 
         std_module
-            .function("file_exists", |path: String| {
-                std::path::Path::new(&path).is_file()
+            .function("file_exists", |path: &str| {
+                std::path::Path::new(path).is_file()
             })
             .build()?;
 
         std_module
-            .function("dir_exists", |path: String| {
-                std::path::Path::new(&path).is_dir()
+            .function("dir_exists", |path: &str| {
+                std::path::Path::new(path).is_dir()
             })
             .build()?;
 
@@ -329,14 +329,13 @@ impl SystemModules {
             .function("f64_approx_eq", |value: f64, compare: f64| value == compare)
             .build()?;
 
-
         let crosscom_clone = Arc::clone(&crosscom);
         std_module
             .function("send_script_to_group", move |source: &str| {
                 crosscom_clone
                     .try_read()
                     .unwrap_or_crash(zencstr!(
-                        "[ERROR] Crosscom is locked, cannot call std::send_script_to_group!"
+                        "[ERROR] CrossCom is locked, cannot call std::send_script_to_group!"
                     ))
                     .send_script(source);
             })

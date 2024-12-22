@@ -22,4 +22,4 @@ pub static DELTA_TIME: AtomicF32 = AtomicF32::new(0.0);
 
 /// Is the cursor inside of an UI window?
 /// Global because tracking this across Rune will turn into a mess.
-pub static IS_CURSOR_IN_UI: AtomicBool = AtomicBool::new(true);
+pub static IS_CURSOR_IN_UI: AtomicBool = AtomicBool::new(false);

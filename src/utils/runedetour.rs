@@ -6,7 +6,13 @@ use rune::{
     runtime::{Function, SyncFunction},
     Value,
 };
-use std::sync::Arc;
+use std::sync::{atomic::AtomicUsize, Arc};
+
+/// Amount of parameters to collect from hooked functions.
+pub static COLLECT_PARAMS_COUNT: AtomicUsize = const { AtomicUsize::new(10) };
+
+/// All Rune detours, acquired and non-acquired.
+static RUNE_DETOURS: RwLock<Vec<Arc<RwLock<RDetour>>>> = const { RwLock::new(Vec::new()) };
 
 /// Generates code for the unique ID tied to the calling function, and collects 10 arguments from
 /// `args` into `args_out`.
@@ -21,12 +27,13 @@ macro_rules! generate_detour_id {
             RDetour::register_new_detour($id);
         });
 
-        let mut collected_args = Vec::with_capacity(10);
-        for _ in 0..=collected_args.capacity() {
-            collected_args.push(unsafe { $args.arg::<*mut i64>() } as i64);
+        let mut collected_args =
+            Vec::with_capacity(COLLECT_PARAMS_COUNT.load(std::sync::atomic::Ordering::Relaxed));
+        for _ in 0..collected_args.capacity() {
+            collected_args.push(unsafe { $args.arg::<*const i64>() } as i64);
         }
 
-        RDetour::call_rune_function_on_id($id, collected_args) as *mut i64
+        RDetour::call_rune_function_on_id($id, collected_args) as *const i64
     }};
 }
 
@@ -34,14 +41,11 @@ macro_rules! generate_detour_id {
 /// inside it.
 macro_rules! generate_detour_holder {
     ($fn_name:ident, $id:literal) => {
-        unsafe extern "C" fn $fn_name(mut args: ...) -> *mut i64 {
+        unsafe extern "C" fn $fn_name(mut args: ...) -> *const i64 {
             generate_detour_id!($id, args)
         }
     };
 }
-
-/// All Rune detours, acquired and non-acquired.
-static RUNE_DETOURS: RwLock<Vec<Arc<RwLock<RDetour>>>> = const { RwLock::new(Vec::new()) };
 
 /// Holds the information about a Rune detour.
 #[derive(Default)]
