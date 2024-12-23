@@ -1,3 +1,4 @@
+use super::runedetour::COLLECT_PARAMS_COUNT;
 use crate::{
     utils::extensions::OptionExt,
     winutils::{Renderer, WinUtils},
@@ -9,8 +10,6 @@ use std::{
     io::{Result, Write},
     sync::{atomic::Ordering, Arc, OnceLock},
 };
-
-use super::runedetour::COLLECT_PARAMS_COUNT;
 
 /// Simple JSON config.
 pub struct Config {

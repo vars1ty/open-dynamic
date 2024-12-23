@@ -2,7 +2,7 @@ cargo-features = ["trim-paths"]
 
 [package]
 name = "dynamic"
-version = "6.6.0-release"
+version = "6.7.0-release"
 edition = "2021"
 
 [lib]
