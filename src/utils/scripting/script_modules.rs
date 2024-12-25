@@ -170,7 +170,6 @@ impl SystemModules {
         memory_module
             .function("read_string", Self::read_string)
             .build()?;
-
         memory_module
             .function("fn_call", FNCaller::call_auto)
             .build()?;

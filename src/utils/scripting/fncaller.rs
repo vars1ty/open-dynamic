@@ -4,6 +4,10 @@ use rune::Value;
 
 /// Experimental function caller.
 /// No safety is included with this, use at your own risk!
+///
+/// Design Issue: C-Functions like `void name(longlong, float)` cannot be called properly, as the
+/// `float` parameter is always getting sent an i64 value, with (currently) no safe way of changing
+/// it and make it work with both.
 pub struct FNCaller;
 
 #[allow(clippy::too_many_arguments)]
