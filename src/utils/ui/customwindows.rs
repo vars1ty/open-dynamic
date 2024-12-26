@@ -840,6 +840,7 @@ impl CustomWindowsUtils {
     }
 
     /// Attempts to get the value of a f32-slider in the currently-active window.
+    #[deprecated = "Requires UI focus, replaced with callbacks."]
     pub fn get_f32_slider_value(&self, identifier: String) -> Option<f32> {
         let WidgetType::F32Slider(_, _, _, current_value, _, _) =
             *self.get_widget(&identifier)?.borrow()
@@ -851,6 +852,7 @@ impl CustomWindowsUtils {
     }
 
     /// Attempts to get the value of a i32-slider in the currently-active window.
+    #[deprecated = "Requires UI focus, replaced with callbacks."]
     pub fn get_i32_slider_value(&self, identifier: String) -> Option<i32> {
         let WidgetType::I32Slider(_, _, _, current_value, _, _) =
             *self.get_widget(&identifier)?.borrow()
@@ -862,6 +864,7 @@ impl CustomWindowsUtils {
     }
 
     /// Attempts to get the value of a i32-slider in the currently-active window.
+    #[deprecated = "Requires UI focus, replaced with callbacks."]
     pub fn get_input_text_multiline_value(&self, identifier: String) -> Option<String> {
         let widget = self.get_widget(&identifier)?;
         let WidgetType::InputTextMultiLine(_, input, _, _, _, _) = &*widget.borrow() else {
