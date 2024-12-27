@@ -2,13 +2,20 @@ use crate::winutils::WinUtils;
 use ahash::AHashMap;
 use atomic_float::AtomicF32;
 use atomic_refcell::AtomicRefCell;
-use std::sync::{atomic::AtomicBool, LazyLock};
+use std::sync::{
+    atomic::{AtomicBool, AtomicI64},
+    LazyLock,
+};
 use windows::Win32::System::Diagnostics::ToolHelp::MODULEENTRY32;
 use zstring::ZString;
 
 /// Safe wrapper around MODULEENTRY32.
 pub struct SafeMODULEENTRY32(pub MODULEENTRY32);
 thread_safe_structs!(SafeMODULEENTRY32);
+
+/// ImGui mutable context pointer.
+/// Safety doesn't exist, it's only intended for accessing the colors slice, nothing else.
+pub static CONTEXT_PTR: AtomicI64 = AtomicI64::new(0);
 
 /// Cached process modules.
 pub static MODULES: LazyLock<AHashMap<String, SafeMODULEENTRY32>> =

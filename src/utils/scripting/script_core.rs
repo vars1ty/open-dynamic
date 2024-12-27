@@ -20,6 +20,44 @@ use zstring::ZString;
 pub struct ValueWrapper(pub Value);
 thread_safe_structs!(ValueWrapper);
 
+/// Experimental Mutexes for Rune.
+#[derive(Any)]
+pub struct MutexValue {
+    /// Inner `Value` of the Mutex.
+    inner: Mutex<Value>,
+}
+
+impl MutexValue {
+    /// Creates a new instance of `Self`.
+    pub fn new(value: Value) -> Self {
+        Self {
+            inner: Mutex::new(value),
+        }
+    }
+
+    /// Tries to clone and return the inner value of the Mutex.
+    /// Returns `None` if locked.
+    pub fn try_get(&self) -> Option<Value> {
+        self.inner.try_lock().as_deref().cloned()
+    }
+
+    /// Tries to change the inner value of the Mutex.
+    /// Returns `false` if locked.
+    pub fn try_set(&self, new_value: Value) -> bool {
+        let Some(mut inner) = self.inner.try_lock() else {
+            return false;
+        };
+
+        *inner = new_value;
+        true
+    }
+
+    /// Checks if the inner value is locked or not.
+    pub fn is_locked(&self) -> bool {
+        self.inner.is_locked()
+    }
+}
+
 /// Structure that implements Send and Sync so that the `Vm` inside of it can be used for
 /// `compiled_scripts`.
 /// It is **not** recommended to send the VM instance across threads, instead use `SyncFunction` if

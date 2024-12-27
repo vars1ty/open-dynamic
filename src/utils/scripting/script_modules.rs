@@ -1,6 +1,6 @@
 use super::{
     fncaller::FNCaller,
-    script_core::{ScriptCore, ValueWrapper},
+    script_core::{MutexValue, ScriptCore, ValueWrapper},
 };
 use crate::{
     globals::*,
@@ -66,6 +66,7 @@ impl SystemModules {
 
         module.ty::<RuneDoubleResultPrimitive>()?;
         module.ty::<AddressType>()?;
+        module.ty::<MutexValue>()?;
 
         dynamic_module
             .function("log", |data: &str| {
@@ -339,6 +340,17 @@ impl SystemModules {
                     .send_script(source);
             })
             .build()?;
+
+        std_module.function("new_mutex", MutexValue::new).build()?;
+        module
+            .function("try_get", MutexValue::try_get)
+            .build_associated::<MutexValue>()?;
+        module
+            .function("try_set", MutexValue::try_set)
+            .build_associated::<MutexValue>()?;
+        module
+            .function("is_locked", MutexValue::is_locked)
+            .build_associated::<MutexValue>()?;
 
         Ok(vec![
             module,
@@ -979,6 +991,12 @@ impl UIModules {
                     )
                 },
             )
+            .build()?;
+
+        module
+            .function("set_color_preset_for_focused", |preset| {
+                custom_window_utils.set_color_preset_for_focused(preset)
+            })
             .build()?;
 
         Ok(module)

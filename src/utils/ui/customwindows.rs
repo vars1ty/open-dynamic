@@ -1,4 +1,6 @@
+use crate::globals::CONTEXT_PTR;
 use crate::mod_cores::base_core::BaseCore;
+use crate::utils::config::Config;
 use crate::utils::dynwidget::SubWidgetType;
 use crate::utils::eguiutils::{CustomTexture, CustomTextureType};
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, stringutils::StringUtils};
@@ -74,6 +76,9 @@ pub struct CustomWindowsUtils {
     /// No `*Map` because it requires traits which aren't implemented for `*Function` in order to
     /// add entries.
     pending_callbacks: Mutex<Vec<(Rc<SyncFunction>, CallbackType)>>,
+
+    /// UI Color Presets for each window.
+    window_color_presets: DashMap<String, String>,
 }
 
 thread_safe_structs!(CustomWindowsUtils);
@@ -81,6 +86,13 @@ thread_safe_structs!(CustomWindowsUtils);
 impl CustomWindowsUtils {
     /// Draws all of the custom windows.
     pub fn draw_custom_windows(&self, ui: &imgui::Ui, base_core: Arc<RwLock<BaseCore>>) {
+        let Some(base_core_reader) = base_core.try_read() else {
+            return;
+        };
+
+        let config = base_core_reader.get_config();
+        drop(base_core_reader);
+
         let Some(window_titles) = self.window_titles.try_read() else {
             return;
         };
@@ -107,6 +119,7 @@ impl CustomWindowsUtils {
                 continue;
             };
 
+            let default_style = self.activate_color_preset_for_window(custom_window, config);
             ui.window(&**custom_window)
                 .size(DEFAULT_SIZE, Condition::FirstUseEver)
                 .size_constraints(
@@ -118,9 +131,48 @@ impl CustomWindowsUtils {
                     self.draw_custom_window(Arc::clone(&base_core), &widgets, ui);
                     ImGuiUtils::render_software_cursor(ui, &mut self.point.get());
                 });
+
+            if let Some(default_style) = default_style {
+                self.restore_preset_to_default(default_style);
+            }
         }
 
         self.call_pending_callbacks();
+    }
+
+    /// Activates the UI Color preset from `window`, if any.
+    /// Return value is the default preset if the style was changed, use `restore_preset_to_default` on it after rendering the window.
+    fn activate_color_preset_for_window(
+        &self,
+        window: &str,
+        config: &Config,
+    ) -> Option<[[f32; 4]; StyleColor::COUNT]> {
+        let context_ptr = CONTEXT_PTR.load(Ordering::Relaxed);
+        if context_ptr == 0 {
+            return None;
+        }
+
+        let ctx: &mut imgui::Context = unsafe { &mut *(context_ptr as *mut imgui::Context) };
+        let preset = self.window_color_presets.get(window)?;
+        if preset.is_empty() {
+            return None;
+        }
+
+        let last_colors = ctx.style_mut().colors;
+        config.load_colors_from_file(ctx, &preset);
+
+        Some(last_colors)
+    }
+
+    /// Restores the UI Colors to `default_preset`.
+    fn restore_preset_to_default(&self, default_preset: [[f32; 4]; StyleColor::COUNT]) {
+        let context_ptr = CONTEXT_PTR.load(Ordering::Relaxed);
+        if context_ptr == 0 {
+            return;
+        }
+
+        let ctx: &mut imgui::Context = unsafe { &mut *(context_ptr as *mut imgui::Context) };
+        ctx.style_mut().colors = default_preset;
     }
 
     /// Calls the callback `SyncFunction` with `(T, opt_param)`.
@@ -986,6 +1038,24 @@ impl CustomWindowsUtils {
         };
 
         cached_texture.texture_id
+    }
+
+    /// Tries to obtain the focused window name.
+    pub fn get_focused_window_name(&self) -> Option<String> {
+        self.window_titles
+            .try_read()?
+            .get(self.current_window_index.load(Ordering::Relaxed))
+            .cloned() // Lifetime issues, fix later if possible.
+    }
+
+    /// Sets the UI Color preset for the focused window.
+    pub fn set_color_preset_for_focused(&self, preset: String) {
+        let Some(focused_window) = self.get_focused_window_name() else {
+            log!("[ERROR] No focused window, or window titles is busy!");
+            return;
+        };
+
+        self.window_color_presets.insert(focused_window, preset);
     }
 
     /// Hides a set of widgets by their identifiers from all windows.

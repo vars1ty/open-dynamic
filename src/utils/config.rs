@@ -3,6 +3,7 @@ use crate::{
     utils::extensions::OptionExt,
     winutils::{Renderer, WinUtils},
 };
+use rune::runtime::IteratorTrait;
 use serde_jsonc::Value;
 use std::{
     fmt::Display,
@@ -185,6 +186,69 @@ impl Config {
             self.get_full_path_for(name.as_ref())
                 .unwrap_or_crash(zencstr!("[ERROR] File name cannot be empty!")),
         )
+    }
+
+    /// Saves the current colors from `ui` into the desired file at the same path as dynamic.
+    pub fn save_colors_to_file(&self, ui: &hudhook::imgui::Ui, name: &str) {
+        if name.is_empty() {
+            log!("[ERROR] File name cannot be empty!");
+            return;
+        }
+
+        let colors = unsafe { ui.style().colors };
+        let mut content = String::with_capacity(2048);
+
+        for [r, g, b, a] in colors {
+            content.push_str(&format!("{r},{g},{b},{a}\n"));
+        }
+
+        self.save_to_file(name, &content);
+    }
+
+    /// Loads the colors from the specified file into the current UI context.
+    pub fn load_colors_from_file(&self, ctx: &mut hudhook::imgui::Context, name: &str) {
+        if name.is_empty() {
+            log!("[ERROR] File name cannot be empty!");
+            return;
+        }
+
+        let mut content = String::default();
+        if !self.get_file_content(name, &mut content) {
+            return;
+        }
+
+        let mut colors = ctx.style_mut().colors;
+        for (i, line) in content.lines().enumerate() {
+            if line.is_empty() || !line.contains(',') {
+                continue;
+            }
+
+            let mut split = line.split(',');
+            let r: f32 = split
+                .nth(0)
+                .unwrap_or_crash(zencstr!("[ERROR] No R value at \"", line, "\"!"))
+                .parse()
+                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing R as f32, error: ", error));
+            let g: f32 = split
+                .nth(0)
+                .unwrap_or_crash(zencstr!("[ERROR] No G value at \"", line, "\"!"))
+                .parse()
+                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing G as f32, error: ", error));
+            let b: f32 = split
+                .nth(0)
+                .unwrap_or_crash(zencstr!("[ERROR] No B value at \"", line, "\"!"))
+                .parse()
+                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing B as f32, error: ", error));
+            let a: f32 = split
+                .nth(0)
+                .unwrap_or_crash(zencstr!("[ERROR] No A value at \"", line, "\"!"))
+                .parse()
+                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing A as f32, error: ", error));
+
+            colors[i] = [r, g, b, a];
+        }
+
+        ctx.style_mut().colors = colors;
     }
 
     /// Gets the path to the DLL directory.

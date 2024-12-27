@@ -1,5 +1,5 @@
 use crate::{
-    globals::{DELTA_TIME, IS_CURSOR_IN_UI},
+    globals::{CONTEXT_PTR, DELTA_TIME, IS_CURSOR_IN_UI},
     mod_cores::base_core::BaseCore,
     ui::community::CommunityWindow,
     utils::{
@@ -51,6 +51,12 @@ pub struct DX11UI {
 
     /// Default dynamic ImGui style.
     default_style: Style,
+
+    /// UI Colors preset input field.
+    ui_colors_preset: String,
+
+    /// If `true`, the defined preset from `ui_colors_preset` will be loaded next frame.
+    load_colors_on_next_frame: bool,
 }
 
 impl DX11UI {
@@ -86,6 +92,8 @@ impl DX11UI {
             crosscom_channel,
             invalid_textures: Vec::with_capacity(4),
             default_style: Style::default(),
+            ui_colors_preset: String::default(),
+            load_colors_on_next_frame: false,
         }
     }
 
@@ -299,6 +307,34 @@ impl DX11UI {
             "!"
         );
     }
+
+    /// If `self.load_colors_on_next_frame` is `true`, then the color preset from `self.ui_colors_preset` is loaded.
+    fn load_ui_colors_preset(&mut self, ctx: &mut Context) {
+        if !self.load_colors_on_next_frame {
+            return;
+        }
+
+        self.load_colors_on_next_frame = false;
+        let base_core_reader = self
+            .base_core
+            .try_read()
+            .unwrap_or_crash(zencstr!("[ERROR] BaseCore is locked!"));
+        base_core_reader
+            .get_config()
+            .load_colors_from_file(ctx, &self.ui_colors_preset);
+        self.ui_colors_preset.clear();
+    }
+
+    /// Displays 2 warning messages about colors.
+    fn display_colors_warning(&self, ui: &imgui::Ui) {
+        let text_color = ui.push_style_color(
+            StyleColor::Text,
+            ColorUtils::rgba_to_frgba([255, 105, 0, 255]),
+        );
+        label!(ui, "󱇎 Warning: Text Color on buttons and alike isn't directly derived from the UI Stylesheet, and is instead programmed into dynamic.");
+        label!(ui, "󱇎 Warning: Save and Load isn't yet implemented, this is just a preview and lack features.");
+        text_color.pop();
+    }
 }
 
 impl ImguiRenderLoop for DX11UI {
@@ -328,7 +364,9 @@ impl ImguiRenderLoop for DX11UI {
         _ctx: &mut Context,
         _render_context: &'a mut dyn RenderContext,
     ) {
+        CONTEXT_PTR.store(std::ptr::addr_of!(_ctx) as i64, Ordering::Relaxed);
         self.load_unitialized_textures(_render_context);
+        self.load_ui_colors_preset(_ctx);
     }
 
     /// Renders the UI.
@@ -342,6 +380,7 @@ impl ImguiRenderLoop for DX11UI {
             return;
         };
 
+        let config = base_core_reader.get_config();
         let imgui_utils = base_core_reader.get_imgui_utils();
         let Some(imgui_utils_reader) = imgui_utils.try_read() else {
             return;
@@ -436,10 +475,26 @@ impl ImguiRenderLoop for DX11UI {
                 if ui.collapsing_header(zencstr!("󰉼 Colors"), TreeNodeFlags::OPEN_ON_ARROW) {
                     text_color.pop();
 
-                    let text_color = ui.push_style_color(StyleColor::Text, ColorUtils::rgba_to_frgba([255, 105, 0, 255]));
-                    label!(ui, "󱇎 Warning: Text Color on buttons and alike isn't directly derived from the UI Stylesheet, and is instead programmed into dynamic.");
-                    label!(ui, "󱇎 Warning: Save and Load isn't yet implemented, this is just a preview and lack features.");
-                    text_color.pop();
+                    self.display_colors_warning(ui);
+                    let text_color = ui.push_style_color(StyleColor::Text, [0.0, 0.0, 0.0, 1.0]);
+                    if ui.collapsing_header(zencstr!("󰆓 Management"), TreeNodeFlags::OPEN_ON_ARROW)
+                    {
+                        text_color.pop();
+
+                        ui.input_text(zencstr!("󰈔 Name"), &mut self.ui_colors_preset)
+                            .build();
+                        if button!(ui, "󱣪 Save") {
+                            config.save_colors_to_file(ui, &self.ui_colors_preset);
+                        }
+
+                        ui.same_line();
+
+                        if button!(ui, "󰦗 Load") {
+                            self.load_colors_on_next_frame = true;
+                        }
+                    } else {
+                        text_color.pop();
+                    }
 
                     ui.show_style_editor(&mut self.default_style);
                 } else {
