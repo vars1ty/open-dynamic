@@ -7,6 +7,7 @@
 extern crate obfstr;
 
 extern crate zstring;
+extern crate libc;
 
 #[macro_use]
 #[path = "utils/macros.rs"]

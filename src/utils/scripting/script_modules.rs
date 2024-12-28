@@ -331,6 +331,14 @@ impl SystemModules {
                     .send_script(source);
             })
             .build()?;
+        std_module
+            .function("malloc", |size| unsafe { libc::malloc(size) } as i64)
+            .build()?;
+        std_module
+            .function("free", |ptr: i64| unsafe {
+                libc::free(ptr as *mut _);
+            })
+            .build()?;
 
         Ok(vec![
             module,
