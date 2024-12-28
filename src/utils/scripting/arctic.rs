@@ -38,15 +38,6 @@ pub struct DNXFunctions {
     /// Rune VM which you may use to execute Rune code.
     rune_vm_execute: Box<dyn Fn(String) + Send + Sync>,
 
-    /// `dynamic::create_thread_key(name)` function. Creates a globally-accessible thread-key.
-    dyamic_add_thread_key: Box<dyn Fn(String) + Send + Sync>,
-
-    /// `dynamic::set_thread_key_value(name, value)` function. Sets the value of a thread-key.
-    dynamic_set_thread_key_value: Box<dyn Fn(String, bool) + Send + Sync>,
-
-    /// `dynamic::get_thread_key(name)` function. Returns the value of the thread-key.
-    dynamic_get_thread_key: Box<dyn Fn(String) -> bool + Send + Sync>,
-
     /// `ui::add_window(name)` function. Allocates and displays a new custom window.
     ui_add_window: Box<dyn Fn(String) + Send + Sync>,
 
@@ -146,8 +137,6 @@ impl Arctic {
                 let injected_dlls = Arc::clone(&injected_dlls);
 
                 let custom_window_utils = base_core_reader.get_custom_window_utils();
-                let script_core = base_core_reader.get_script_core();
-
                 drop(base_core_reader);
 
                 let funcs = DNXFunctions {
@@ -169,19 +158,6 @@ impl Arctic {
                         );
 
                         drop(reader);
-                    }),
-                    dyamic_add_thread_key: Box::new(|identifier| {
-                        SystemModules::create_thread_key(identifier, script_core.get_thread_keys())
-                    }),
-                    dynamic_set_thread_key_value: Box::new(|identifier, enabled| {
-                        SystemModules::set_thread_key_value(
-                            identifier,
-                            enabled,
-                            script_core.get_thread_keys(),
-                        )
-                    }),
-                    dynamic_get_thread_key: Box::new(|identifier| {
-                        SystemModules::get_thread_key(identifier, script_core.get_thread_keys())
                     }),
                     ui_add_window: Box::new(move |name| {
                         custom_window_utils.add_window(name);

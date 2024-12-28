@@ -3,7 +3,6 @@ use crate::{
     utils::extensions::OptionExt,
     winutils::{Renderer, WinUtils},
 };
-use rune::runtime::IteratorTrait;
 use serde_jsonc::Value;
 use std::{
     fmt::Display,
