@@ -55,17 +55,6 @@ pub struct DNXFunctions {
     /// config.
     config_has_serial: Box<dyn Fn(String) -> bool + Send + Sync>,
 
-    /// The underlying implementation of this function tries to check if the variable you defined
-    /// has an address cached, if it does then it's returned.
-    /// If it hasn't been cached, then the `sig_scan_address` function is called and you are
-    /// expected to return the address as an `usize`, which then CrossCom stores in memory for you
-    /// to later retrieve from the cache, using this exact same function.
-    ///
-    /// The server caches the offset to the static address you defined, via the `base_address` and
-    /// then returns (or caches it if not present) it for you.
-    server_aob_scan:
-        Box<dyn Fn(&str, usize, Box<dyn FnOnce() -> usize>) -> *const i64 + Send + Sync>,
-
     /// Tries to find the underlying string-value of the data you requested.
     /// If no data was found, `None` is returned.
     server_get_variable: Box<dyn Fn(&str) -> Option<String> + Send + Sync>,
@@ -124,7 +113,6 @@ impl Arctic {
                     .unwrap_or_crash(zencstr!("[ERROR] Failed reading BaseCore!"));
 
                 let crosscom_check_is_ex_serial_ok = base_core_reader.get_crosscom();
-                let crosscom_server_aob_scan = base_core_reader.get_crosscom();
                 let crosscom_seerver_get_variable = base_core_reader.get_crosscom();
                 let crosscom_server_get_current_channel = base_core_reader.get_crosscom();
                 let crosscom_server_join_channel = base_core_reader.get_crosscom();
@@ -178,19 +166,6 @@ impl Arctic {
                     config_has_serial: Box::new(move |serial| {
                         serials_config_has_serial.contains(&serial)
                     }),
-                    server_aob_scan: Box::new(
-                        move |variable_name, base_address, sig_scan_address| {
-                            let crosscom = Arc::clone(&crosscom_server_aob_scan);
-                            let variables = Arc::new(RwLock::new(crosscom.read().get_variables()));
-                            WinUtils::server_aob_scan(
-                                variable_name,
-                                base_address,
-                                variables,
-                                sig_scan_address,
-                                crosscom,
-                            )
-                        },
-                    ),
                     server_get_variable: Box::new(move |variable_name| {
                         let crosscom = Arc::clone(&crosscom_seerver_get_variable);
                         let reader = crosscom.read();

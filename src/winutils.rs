@@ -1,15 +1,13 @@
 use crate::{
     globals::{SafeMODULEENTRY32, LOGGED_MESSAGES, MODULES},
     utils::{
-        crosscom::CrossCom,
         extensions::{OptionExt, ResultExtensions},
         types::char_ptr,
     },
 };
 use ahash::AHashMap;
-use parking_lot::RwLock;
 use rune::Any;
-use std::{collections::HashMap, ffi::*, os::windows::prelude::OsStringExt, sync::Arc};
+use std::{ffi::*, os::windows::prelude::OsStringExt};
 use windows::{
     core::PCSTR,
     Win32::{
@@ -228,82 +226,16 @@ impl WinUtils {
         }
     }
 
-    /// If `variables` contains `variable_name`, the value is parsed and returned.
-    /// If it doesn't contain the value, the `sig_scan_address` closure is called, offset is saved,
-    /// parsed and returned.
-    pub fn server_aob_scan<F: FnOnce() -> usize>(
-        variable_name: &str,
-        base_address: usize,
-        variables: Arc<RwLock<HashMap<String, String>>>,
-        sig_scan_address: F,
-        crosscom: Arc<RwLock<CrossCom>>,
-    ) -> *const i64 {
-        if base_address == 0 {
-            crash!(
-                "[ERROR] Passed base address was null for \"",
-                variable_name,
-                "\"!"
-            );
-        }
-
-        // A reader is required, because if we just use read() in the if-statement, then it won't
-        // cache the addresses.
-        let variables_reader = variables.read();
-
-        // entry() would work here, but it would require a consistent write() lock, slowing things
-        // down.
-        // In this code, a reader is used to try and get the value. If `None`, it switches to using
-        // a writer and inserts the value before returning it.
-        let offset: usize = if let Some(value) = variables_reader.get(variable_name) {
-            value.parse().dynamic_expect(zencstr!(
-                "[ERROR] Failed parsing offset for \"",
-                variable_name,
-                "\" as usize"
-            ))
-        } else {
-            // Drop reader, we don't need it anymore.
-            drop(variables_reader);
-
-            let scan_address = sig_scan_address();
-            if scan_address == 0 {
-                crash!(
-                    "[ERROR] sig_scan_address for \"",
-                    variable_name,
-                    "\" is null!"
-                );
-            }
-
-            if scan_address <= base_address {
-                crash!(
-                    "[ERROR] sig_scan_address for \"",
-                    variable_name,
-                    "\" is less (or eq.)  to the base address. sig_scan_address == ",
-                    scan_address
-                );
-            }
-
-            // Calculate offset and add it as a string.
-            let offset = scan_address - base_address;
-
-            // Insert and tell CrossCom to update the variable.
-            let mut variables_writer = variables.write();
-            variables_writer.insert(variable_name.to_string(), offset.to_string());
-            crosscom.read().send_variables(variables_writer.to_owned());
-
-            drop(variables_writer);
-            offset
-        };
-
-        unsafe { (base_address as *const i64).byte_add(offset) }
-    }
-
     /// Returns the cursor position within the foreground window.
     /// This requires an already-made `POINT` instance, as it will output the data to it.
     pub fn get_cursor_pos_recycle(point: &mut POINT) {
         unsafe {
             let cursor_pos = GetCursorPos(point);
-            if cursor_pos.is_err() {
-                log!("[ERROR] Failed to call GetCursorPos, initial value in point remains.");
+            if let Err(error) = cursor_pos {
+                log!(
+                    "[ERROR] Failed to call GetCursorPos, initial value in point remains. Error: ",
+                    error
+                );
                 return;
             }
 
