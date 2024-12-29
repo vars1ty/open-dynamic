@@ -37,6 +37,7 @@ enum CallbackType {
     F32Slider(String, f32, Rc<Option<Value>>),
     Checkbox(String, bool, Rc<Option<Value>>),
     InputTextMultiLine(String, String, Rc<Option<Value>>),
+    ComboBox(String, usize, Rc<Option<Value>>),
 }
 
 /// Custom window utilities for making custom windows easier to use, and supporting multiple
@@ -260,7 +261,16 @@ impl CustomWindowsUtils {
                         callback,
                         Some(current_value),
                         opt_param,
-                        zencstr!("i32 Slider"),
+                        zencstr!("Input Text Multi-line"),
+                        identifier,
+                    )
+                }
+                CallbackType::ComboBox(identifier, current_value, opt_param) => {
+                    Self::call_callback::<usize>(
+                        callback,
+                        Some(*current_value),
+                        opt_param,
+                        zencstr!("ComboBox"),
                         identifier,
                     )
                 }
@@ -470,6 +480,19 @@ impl CustomWindowsUtils {
                         CallbackType::Checkbox(
                             identifier.to_owned(),
                             *checked,
+                            Rc::clone(opt_param),
+                        ),
+                    );
+                }
+            }
+            WidgetType::ComboBox(text, current_item, items, callback, opt_param) => {
+                if ui.combo_simple_string(text, current_item, items) {
+                    self.add_callback(
+                        identifier,
+                        callback,
+                        CallbackType::ComboBox(
+                            identifier.to_owned(),
+                            *current_item,
                             Rc::clone(opt_param),
                         ),
                     );

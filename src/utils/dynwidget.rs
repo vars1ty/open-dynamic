@@ -1,8 +1,8 @@
 use atomic_refcell::AtomicRefCell;
 use indexmap::IndexMap;
 use rune::{runtime::SyncFunction, Value};
-use zstring::ZString;
 use std::{rc::Rc, sync::Arc};
+use zstring::ZString;
 
 /// ImGui widget type.
 #[derive(Clone)]
@@ -24,7 +24,7 @@ pub enum WidgetType {
         bool,
         Rc<SyncFunction>,
         Rc<Option<Value>>,
-        bool
+        bool,
     ),
     InputTextMultiLine(
         ZString,
@@ -44,6 +44,13 @@ pub enum WidgetType {
     ),
 
     Checkbox(ZString, bool, Rc<SyncFunction>, Rc<Option<Value>>),
+    ComboBox(
+        ZString,
+        usize,
+        Vec<String>,
+        Rc<SyncFunction>,
+        Rc<Option<Value>>,
+    ),
 }
 
 /// Sub-widget type, aka types like collapsing headers and alike.

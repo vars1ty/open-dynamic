@@ -954,6 +954,28 @@ impl UIModules {
             .build()?;
 
         module
+            .function(
+                "add_combobox",
+                |identifier: String,
+                 text: String,
+                 (items, selected_index),
+                 on_value_changed: Function,
+                 opt_param: Option<Value>| {
+                    custom_window_utils.add_widget(
+                        identifier.to_owned(),
+                        WidgetType::ComboBox(
+                            ZString::new(text),
+                            selected_index,
+                            items,
+                            Self::function_into_sync(on_value_changed, identifier),
+                            Rc::new(opt_param),
+                        ),
+                    )
+                },
+            )
+            .build()?;
+
+        module
             .function("set_color_preset_for_focused", |preset| {
                 custom_window_utils.set_color_preset_for_focused(preset)
             })

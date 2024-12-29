@@ -56,6 +56,7 @@ pub struct DX11UI {
     ui_colors_preset: String,
 
     /// If `true`, the defined preset from `ui_colors_preset` will be loaded next frame.
+    #[deprecated = "CONTEXT_PTR is safe for modifying colors, no need for this."]
     load_colors_on_next_frame: bool,
 }
 

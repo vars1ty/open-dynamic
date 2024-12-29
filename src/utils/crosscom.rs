@@ -249,16 +249,15 @@ impl CrossCom {
                     self.send_to_channel(server_data);
                 }
             }
-            DataType::UpdateChannelSuccess | DataType::SendFonts(..) => {
-                self.send_to_channel(server_data);
-            }
-            DataType::ReceiveVariables(_) => self.send_to_channel(server_data),
+            DataType::ReceiveVariables(..)
+            | DataType::CheckIsSerialOKResponse(..)
+            | DataType::UpdateChannelSuccess
+            | DataType::SendFonts(..) => self.send_to_channel(server_data),
             DataType::BroadcastCommunityContent(ref content) => {
                 if content.is_some() {
                     self.send_to_channel(server_data)
                 }
             }
-            DataType::CheckIsSerialOKResponse(_success) => self.send_to_channel(server_data),
             DataType::ServerError(ref error) => crash!(error),
             _ => {
                 crash!("[SECURITY] Received an unknown data type, closing dynamic for your own safety.");
