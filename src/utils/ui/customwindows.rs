@@ -3,6 +3,7 @@ use crate::mod_cores::base_core::BaseCore;
 use crate::utils::config::Config;
 use crate::utils::dynwidget::SubWidgetType;
 use crate::utils::eguiutils::{CustomTexture, CustomTextureType};
+use crate::utils::extensions::ResultExtensions;
 use crate::utils::{dynwidget::WidgetType, eguiutils::ImGuiUtils, stringutils::StringUtils};
 use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
@@ -546,14 +547,11 @@ impl CustomWindowsUtils {
         };
 
         pending_callbacks.push((
-            callback.try_clone().unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed cloning function named \"",
-                    identifier,
-                    "\", error: ",
-                    error
-                )
-            }),
+            callback.try_clone().dynamic_expect(zencstr!(
+                "Failed cloning function named \"",
+                identifier,
+                "\""
+            )),
             callback_type,
         ));
     }

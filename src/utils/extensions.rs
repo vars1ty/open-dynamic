@@ -41,3 +41,39 @@ impl StringExtensions for String {
         hash.finish().to_string()
     }
 }
+
+/// Extensions for `Result<T, E>`.
+pub trait ResultExtensions<T, E> {
+    /// Extension function which works as a replacement for `unwrap()`, which doesn't show the
+    /// error message when crashing due to how dynamic operate.
+    fn dynamic_unwrap(self) -> T
+    where
+        E: std::fmt::Debug + std::fmt::Display;
+
+    /// Extension function which works as a replacement for `expect(message)`.
+    fn dynamic_expect(self, message: ZString) -> T
+    where
+        E: std::fmt::Debug + std::fmt::Display;
+}
+
+impl<T, E> ResultExtensions<T, E> for Result<T, E> {
+    fn dynamic_unwrap(self) -> T
+    where
+        E: std::fmt::Debug + std::fmt::Display,
+    {
+        match self {
+            Ok(value) => value,
+            Err(error) => crash!("[ERROR] Tried to unwrap a `None` value, error: ", error),
+        }
+    }
+
+    fn dynamic_expect(self, message: ZString) -> T
+    where
+        E: std::fmt::Debug + std::fmt::Display,
+    {
+        match self {
+            Ok(value) => value,
+            Err(error) => crash!("[ERROR] ", message, ", error: ", error),
+        }
+    }
+}

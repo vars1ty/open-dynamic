@@ -1,7 +1,11 @@
 use super::crosscom::CrossCom;
 use crate::{
     globals::LOGGED_MESSAGES,
-    utils::{colorutils::ColorUtils, config::Config, extensions::OptionExt},
+    utils::{
+        colorutils::ColorUtils,
+        config::Config,
+        extensions::{OptionExt, ResultExtensions},
+    },
     winutils::WinUtils,
 };
 use dashmap::DashMap;
@@ -112,14 +116,10 @@ impl ImGuiUtils {
             ctx.fonts().add_font(&[FontSource::TtfData {
                 data: &config
                     .get_file_content_bytes(relative_font_path)
-                    .unwrap_or_else(|error| {
-                        crash!(
-                            "[ERROR] Failed reading Font Data from config.jsonc -> fonts -> ",
-                            relative_font_path,
-                            ", error: ",
-                            error
-                        )
-                    }),
+                    .dynamic_expect(zencstr!(
+                        "Failed reading Font Data from config.jsonc -> fonts -> ",
+                        relative_font_path
+                    )),
                 size_pixels: font_size,
                 config: Some(imgui::FontConfig {
                     oversample_h: 4,
@@ -439,8 +439,7 @@ impl ImGuiUtils {
 
     /// Extracts the frames of a GIF into a `Vec<gif::Frame>`.
     pub fn extract_gif_frames(path: &str) -> Vec<gif::Frame> {
-        let input = File::open(path)
-            .unwrap_or_else(|error| crash!("[ERROR] Failed opening GIF, error: ", error));
+        let input = File::open(path).dynamic_expect(zencstr!("Failed opening GIF"));
         let mut options = gif::DecodeOptions::new();
         options.set_color_output(gif::ColorOutput::RGBA);
 

@@ -8,7 +8,7 @@ use crate::{
     utils::{
         crosscom::CrossCom,
         dynwidget::{SubWidgetType, WidgetType},
-        extensions::{F32Ext, OptionExt},
+        extensions::{F32Ext, OptionExt, ResultExtensions},
         runedetour::RDetour,
         scripting::rune_ext_structs::RuneDoubleResultPrimitive,
         stringutils::StringUtils,
@@ -143,12 +143,8 @@ impl SystemModules {
                 |module_name: &str, symbol: &str| {
                     WinUtils::get_module_symbol_address(
                         module_name,
-                        &CString::new(symbol).unwrap_or_else(|error| {
-                            crash!(
-                                "[ERROR] Failed converting symbol to a C-String, error: ",
-                                error
-                            )
-                        }),
+                        &CString::new(symbol)
+                            .dynamic_expect(zencstr!("Failed converting symbol to a C-String")),
                     )
                     .map(|value| value as i64)
                 },
@@ -375,7 +371,7 @@ impl SystemModules {
             value
                 .0
                 .try_clone() // Stupid, but either that or &'static due to lifetime issues.
-                .unwrap_or_else(|error| crash!("[ERROR] Failed cloning value, error: ", error))
+                .dynamic_expect(zencstr!("Failed cloning value"))
         })
     }
 
@@ -384,12 +380,10 @@ impl SystemModules {
     /// compiler option.
     fn run_multi_threaded(function: Function, arg1: Option<Value>) {
         let arg1 = arg1.map(ValueWrapper);
-        let function = function.into_sync().into_result().unwrap_or_else(|error| {
-            crash!(
-                "[ERROR] Failed turning Function into SyncFunction, error: ",
-                error
-            )
-        });
+        let function = function
+            .into_sync()
+            .into_result()
+            .dynamic_expect(zencstr!("Failed turning Function into SyncFunction"));
 
         std::thread::spawn(move || {
             let Err(error) = function
@@ -986,14 +980,11 @@ impl UIModules {
 
     /// Turns `Function` into a `Rc<SyncFunction>`, crashing if it fails.
     fn function_into_sync(function: Function, identifier: String) -> Rc<SyncFunction> {
-        Rc::new(function.into_sync().into_result().unwrap_or_else(|error| {
-            crash!(
-                "[ERROR Failed turning Function into SyncFunction at \"",
-                identifier,
-                "\", error: ",
-                error
-            )
-        }))
+        Rc::new(function.into_sync().into_result().dynamic_expect(zencstr!(
+            "Failed turning Function into SyncFunction at \"",
+            identifier,
+            "\""
+        )))
     }
 
     /// Helper function for making it easier to add sub-widgets.

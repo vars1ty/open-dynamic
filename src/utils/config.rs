@@ -1,4 +1,4 @@
-use super::runedetour::COLLECT_PARAMS_COUNT;
+use super::{extensions::ResultExtensions, runedetour::COLLECT_PARAMS_COUNT};
 use crate::{
     utils::extensions::OptionExt,
     winutils::{Renderer, WinUtils},
@@ -44,13 +44,8 @@ impl Default for Config {
 
         let cached_config: OnceLock<Value> = OnceLock::new();
         let cached_config_ref = cached_config.get_or_init(|| {
-            serde_jsonc::from_str(&config_content).unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed parsing config.jsonc, error: ",
-                    error,
-                    "\n[INFO] This is entirely your own fault and not dynamics. Learn JSON!"
-                )
-            })
+            serde_jsonc::from_str(&config_content)
+                .dynamic_expect(zencstr!("Failed parsing config.jsonc"))
         });
 
         let empty_serials = Vec::with_capacity(0);
@@ -124,13 +119,12 @@ impl Config {
             return None;
         }
 
-        // Pre-allocate a string with the length of path and name, plus 2 in case there's any
-        // forward-slashes that need to be replaced with backward-slashes.
-        // Why? Because some Windows setups are fucking braindead and can't cope with
-        // forward-slashes.
-        let mut path = String::with_capacity(self.path.len() + name.len() + 2);
+        // Pre-allocate a string with the length of path and name.
+        let mut path = String::with_capacity(self.path.len() + name.len());
         path.push_str(self.path);
 
+        // Replace forward-slashes with backwards ones, because Windows is overly sensitive and
+        // will fail with forward ones.
         if path.contains('/') {
             path.push_str(&name.replace('/', "\\"));
         } else {
@@ -227,22 +221,22 @@ impl Config {
                 .nth(0)
                 .unwrap_or_crash(zencstr!("[ERROR] No R value at \"", line, "\"!"))
                 .parse()
-                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing R as f32, error: ", error));
+                .dynamic_expect(zencstr!("Failed parsing R as f32"));
             let g: f32 = split
                 .nth(0)
                 .unwrap_or_crash(zencstr!("[ERROR] No G value at \"", line, "\"!"))
                 .parse()
-                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing G as f32, error: ", error));
+                .dynamic_expect(zencstr!("Failed parsing G as f32"));
             let b: f32 = split
                 .nth(0)
                 .unwrap_or_crash(zencstr!("[ERROR] No B value at \"", line, "\"!"))
                 .parse()
-                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing B as f32, error: ", error));
+                .dynamic_expect(zencstr!("Failed parsing B as f32"));
             let a: f32 = split
                 .nth(0)
                 .unwrap_or_crash(zencstr!("[ERROR] No A value at \"", line, "\"!"))
                 .parse()
-                .unwrap_or_else(|error| crash!("[ERROR] Failed parsing A as f32, error: ", error));
+                .dynamic_expect(zencstr!("Failed parsing A as f32"));
 
             colors[i] = [r, g, b, a];
         }

@@ -6,8 +6,8 @@
 #[macro_use]
 extern crate obfstr;
 
-extern crate zstring;
 extern crate libc;
+extern crate zstring;
 
 #[macro_use]
 #[path = "utils/macros.rs"]
@@ -155,6 +155,7 @@ fn hook_based_on_renderer(base_core: Arc<RwLock<BaseCore>>, hmodule: isize) {
     }
 
     if setup_ui {
+        // Can't use dynamic_expect here due to trait restrictions.
         builder.build().apply().unwrap_or_else(|error| {
             crash!(
                 "[ERROR] Failed applying UI hook. Render Target: ",

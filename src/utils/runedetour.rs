@@ -1,5 +1,5 @@
 use super::scripting::script_core::ValueWrapper;
-use crate::utils::extensions::OptionExt;
+use crate::utils::extensions::{OptionExt, ResultExtensions};
 use parking_lot::{Once, RwLock};
 use retour::RawDetour;
 use rune::{
@@ -253,9 +253,7 @@ impl RDetour {
             ))
             .into_result();
         let Err(error) = call_res else {
-            return call_res.unwrap_or_else(|error| {
-                crash!("[ERROR] Safety check for error failed? Error: ", error)
-            });
+            return call_res.dynamic_expect(zencstr!("Safety check for error failed?"));
         };
 
         log!(
@@ -294,8 +292,8 @@ impl RDetour {
     /// This may cause UB and should be used with **extreme** care!
     fn create_hook(from: *const (), to: *const ()) -> Box<RawDetour> {
         unsafe {
-            let hook = RawDetour::new(from, to).unwrap_or_else(|error| crash!(error));
-            hook.enable().unwrap_or_else(|error| crash!(error));
+            let hook = RawDetour::new(from, to).dynamic_unwrap();
+            hook.enable().dynamic_unwrap();
             Box::new(hook)
         }
     }

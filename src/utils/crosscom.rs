@@ -12,7 +12,10 @@ use message_io::{
 use std::{
     cell::{Cell, OnceCell, RefCell},
     collections::HashMap,
-    sync::{Arc, OnceLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, OnceLock,
+    },
 };
 
 /// CrossCom outgoing client data.
@@ -129,7 +132,7 @@ pub struct CrossCom {
     current_channel: RefCell<String>,
 
     /// Has the user requested to change channel?
-    has_pending_channel_update: Cell<bool>,
+    has_pending_channel_update: AtomicBool,
 
     /// Server endpoint.
     server_endpoint: OnceLock<Endpoint>,
@@ -164,7 +167,7 @@ impl CrossCom {
             use_local_server,
             state: Cell::new(CrossComState::Disconnected),
             current_channel: RefCell::new(channel.to_owned()),
-            has_pending_channel_update: Cell::default(),
+            has_pending_channel_update: AtomicBool::default(),
             server_endpoint: OnceLock::new(),
             handler: OnceLock::new(),
             network_listener: NetworkListener::new(),
@@ -438,7 +441,7 @@ impl CrossCom {
     /// Joins a new channel, leaving `channel` as-is since it's the startup value.
     /// No `&self` as it causes deadlocks.
     pub fn join_channel(&self, channel: &str) {
-        if self.has_pending_channel_update.get() {
+        if self.has_pending_channel_update.load(Ordering::Relaxed) {
             log!("[ERROR] You are already in the process of joining a channel, be patient!");
             return;
         }
@@ -461,7 +464,8 @@ impl CrossCom {
             return;
         }
 
-        self.has_pending_channel_update.set(true);
+        self.has_pending_channel_update
+            .store(true, Ordering::Relaxed);
 
         // Keep the channel string within a certain range of characters before applying it as the
         // new channel.
@@ -479,12 +483,14 @@ impl CrossCom {
             .is_some()
         {
             log!("[PARTY] Joined channel!");
-            self.has_pending_channel_update.set(false);
+            self.has_pending_channel_update
+                .store(false, Ordering::Relaxed);
             return;
         }
 
         log!("[ERROR] Failed joining channel, no server approval received!");
-        self.has_pending_channel_update.set(false);
+        self.has_pending_channel_update
+            .store(false, Ordering::Relaxed);
     }
 
     /// Checks if one of the serials for the given Sellix product, is valid.

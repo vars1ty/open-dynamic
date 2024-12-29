@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use zstring::ZString;
 
+use super::extensions::ResultExtensions;
+
 /// Basic string utils.
 pub struct StringUtils;
 
@@ -9,12 +11,7 @@ impl StringUtils {
     pub fn get_random() -> String {
         let mut string = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed getting time since UNIX_EPOCH, error: ",
-                    error
-                )
-            })
+            .dynamic_expect(zencstr!("Failed getting time since UNIX_EPOCH"))
             .subsec_nanos()
             .to_string();
 

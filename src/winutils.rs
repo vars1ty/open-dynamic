@@ -1,6 +1,10 @@
 use crate::{
     globals::{SafeMODULEENTRY32, LOGGED_MESSAGES, MODULES},
-    utils::{crosscom::CrossCom, extensions::OptionExt, types::char_ptr},
+    utils::{
+        crosscom::CrossCom,
+        extensions::{OptionExt, ResultExtensions},
+        types::char_ptr,
+    },
 };
 use ahash::AHashMap;
 use parking_lot::RwLock;
@@ -54,14 +58,11 @@ impl WinUtils {
     /// Gets the path to a module.
     pub fn get_module_path(name: ZString) -> ZString {
         unsafe {
-            let dll_handle = GetModuleHandleA(PCSTR(name.data.as_ptr())).unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed to get a valid handle to the DLL named: ",
-                    &name,
-                    ", error: ",
-                    error
-                )
-            });
+            let dll_handle = GetModuleHandleA(PCSTR(name.data.as_ptr())).dynamic_expect(zencstr!(
+                "Failed to get a valid handle to the module named \"",
+                name,
+                "\""
+            ));
 
             let mut buffer: [u16; MAX_PATH as _] = [0; MAX_PATH as _];
             let size = GetModuleFileNameW(dll_handle, &mut buffer);
@@ -112,19 +113,16 @@ impl WinUtils {
     /// Fetches the modules from the current process and returns them.
     /// This is the non-cache variant of `WinUtils::get_modules`.
     pub fn get_modules_no_cache() -> AHashMap<String, SafeMODULEENTRY32> {
-        let modules = Memory::get_modules()
-            .unwrap_or_else(|error| crash!("[ERROR] Couldn't get process modules, error: ", error));
+        let modules =
+            Memory::get_modules().dynamic_expect(zencstr!("Couldn't get process modules"));
         let mut hashmap = AHashMap::new();
 
         // Insert the modules as Name, SafeMODULEENTRY32.
         for module in modules {
             let module_name = String::from_utf8(Memory::convert_module_name(module.szModule))
-                .unwrap_or_else(|error| {
-                    crash!(
-                        "[ERROR] Couldn't get the module name as a valid UTF-8 String, error: ",
-                        error
-                    )
-                });
+                .dynamic_expect(zencstr!(
+                    "Couldn't get the module name as a valid UTF-8 String"
+                ));
             hashmap.insert(module_name, SafeMODULEENTRY32(module));
         }
 
@@ -166,18 +164,13 @@ impl WinUtils {
         sig: &[u8],
         include_executable: bool,
     ) -> Vec<*const i64> {
-        let handle = Memory::open_current_process().unwrap_or_else(|error| {
-            crash!("[ERROR] Failed opening current process, error: ", error)
-        });
+        let handle = Memory::open_current_process()
+            .dynamic_expect(zencstr!("Failed opening current process"));
         let mut results =
-            Memory::aob_scan(handle, sig, include_executable).unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Scan failed while looking for ",
-                    Self::bytes_to_hex_string(sig),
-                    ", error: ",
-                    error
-                )
-            });
+            Memory::aob_scan(handle, sig, include_executable).dynamic_expect(zencstr!(
+                "[ERROR] Scan failed while looking for ",
+                Self::bytes_to_hex_string(sig)
+            ));
 
         results.retain(|res| *res != sig.as_ptr() as _);
         if address_type == AddressType::Any {
@@ -225,9 +218,7 @@ impl WinUtils {
         unsafe {
             GetModuleHandleA(PCSTR(
                 CString::new(module.as_ref())
-                    .unwrap_or_else(|error| {
-                        crash!("[ERROR] Failed constructing C-String, error: ", error)
-                    })
+                    .dynamic_expect(zencstr!("Failed constructing C-String"))
                     .as_ref()
                     .as_ptr() as _,
             ))
@@ -264,14 +255,11 @@ impl WinUtils {
         // In this code, a reader is used to try and get the value. If `None`, it switches to using
         // a writer and inserts the value before returning it.
         let offset: usize = if let Some(value) = variables_reader.get(variable_name) {
-            value.parse().unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed parsing offset for \"",
-                    variable_name,
-                    "\" as usize, error: ",
-                    error
-                )
-            })
+            value.parse().dynamic_expect(zencstr!(
+                "[ERROR] Failed parsing offset for \"",
+                variable_name,
+                "\" as usize"
+            ))
         } else {
             // Drop reader, we don't need it anymore.
             drop(variables_reader);
@@ -340,19 +328,11 @@ impl WinUtils {
 
     /// Displays a message box.
     pub fn display_message_box(caption: &str, text: &str, message_type: u32) {
-        let text_cstr = CString::new(text).unwrap_or_else(|error| {
-            crash!(
-                "[ERROR] Failed creating C-String out of text, error: ",
-                error
-            )
-        });
+        let text_cstr =
+            CString::new(text).dynamic_expect(zencstr!("Failed creating C-String out of text"));
 
-        let caption_cstr = CString::new(caption).unwrap_or_else(|error| {
-            crash!(
-                "[ERROR] Failed creating C-String out of caption, error: ",
-                error
-            )
-        });
+        let caption_cstr = CString::new(caption)
+            .dynamic_expect(zencstr!("Failed creating C-String out of caption"));
 
         unsafe {
             MessageBoxA(

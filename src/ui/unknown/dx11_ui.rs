@@ -5,7 +5,7 @@ use crate::{
     utils::{
         colorutils::ColorUtils,
         eguiutils::{CustomTexture, CustomTextureType, ImGuiUtils},
-        extensions::OptionExt,
+        extensions::{OptionExt, ResultExtensions},
     },
     winutils::WinUtils,
 };
@@ -73,12 +73,7 @@ impl DX11UI {
         let crosscom_channel = crosscom
             .get_current_channel()
             .try_borrow()
-            .unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed borrowing crosscom.current_channel, error: ",
-                    error
-                )
-            })
+            .dynamic_expect(zencstr!("Failed borrowing crosscom.current_channel"))
             .to_owned();
         drop(reader);
 

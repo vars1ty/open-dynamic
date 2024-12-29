@@ -1,3 +1,4 @@
+use super::extensions::ResultExtensions;
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use std::io::{Read, Write};
 
@@ -10,21 +11,16 @@ impl CompressionUtils {
         let mut encoder = ZlibEncoder::new(Vec::with_capacity(512), Compression::fast());
         encoder
             .write_all(&bytes)
-            .unwrap_or_else(|error| crash!("[ERROR] Failed writing bytes, error: ", error));
+            .dynamic_expect(zencstr!("Failed writing bytes"));
         encoder
             .finish()
-            .unwrap_or_else(|error| crash!("[ERROR] Failed compressing bytes, error: ", error))
+            .dynamic_expect(zencstr!("Failed compressing bytes"))
     }
 
     /// Decompresses the given bytes.
     pub fn decompress(bytes: &[u8], output: &mut Vec<u8>) {
         ZlibDecoder::new(bytes)
             .read_to_end(output)
-            .unwrap_or_else(|error| {
-                crash!(
-                    "[ERROR] Failed reading decompressed bytes to output, error: ",
-                    error
-                )
-            });
+            .dynamic_expect(zencstr!("Failed reading decompressed bytes to output"));
     }
 }

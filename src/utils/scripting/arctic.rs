@@ -1,7 +1,10 @@
 use crate::{
     globals::DELTA_TIME,
     mod_cores::base_core::BaseCore,
-    utils::{extensions::OptionExt, scripting::script_modules::*},
+    utils::{
+        extensions::{OptionExt, ResultExtensions},
+        scripting::script_modules::*,
+    },
     winutils::WinUtils,
 };
 use dashmap::DashMap;
@@ -270,8 +273,7 @@ impl Arctic {
             unsafe { std::mem::transmute(address) };
 
         // Save the DLL and its payload so we remember it.
-        let payload = payload
-            .unwrap_or_else(|error| crash!("[ERROR] Failed getting payload, error: ", error));
+        let payload = payload.dynamic_expect(zencstr!("Failed getting payload"));
         self.injected_dlls.insert(payload, dll_name);
 
         // Handle function calls from the library.
@@ -307,7 +309,7 @@ impl Arctic {
             // Attempt eject.
             Syringe::for_process(process)
                 .eject(payload)
-                .unwrap_or_else(|error| crash!("[ERROR] Ejection error: ", error));
+                .dynamic_expect(zencstr!("Failed ejecting payload"));
         });
     }
 
