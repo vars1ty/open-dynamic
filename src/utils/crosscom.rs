@@ -306,11 +306,6 @@ impl CrossCom {
         log!("[PARTY] Sent script to channel members!");
     }
 
-    /// Sends the variables, if required to.
-    pub fn send_variables(&self, variables: HashMap<String, String>) {
-        self.send_data_type(DataType::UpdateVariables(variables));
-    }
-
     /// Sends the specified data type and waits for a server message to be received, then
     /// passes it into `callback`.
     /// `callback` should return true/false for whether or not the message was the correct one or
