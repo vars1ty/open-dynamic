@@ -157,35 +157,16 @@ impl WinUtils {
     /// `module` is only relevant when using `AddressType::Static`.
     #[optimize(speed)]
     pub fn find_from_signature(
-        address_type: AddressType,
-        module: Option<&str>,
+        module: &str,
         sig: &[u8],
         include_executable: bool,
     ) -> Vec<*const i64> {
         let handle = Memory::open_current_process()
             .dynamic_expect(zencstr!("Failed opening current process"));
-        let mut results =
-            Memory::aob_scan(handle, sig, include_executable).dynamic_expect(zencstr!(
-                "[ERROR] Scan failed while looking for ",
-                Self::bytes_to_hex_string(sig)
-            ));
-
-        results.retain(|res| *res != sig.as_ptr() as _);
-        if address_type == AddressType::Any {
-            return results;
-        }
-
-        results.retain(|res| {
-            if let Some(module) = module {
-                let base_address = Self::get_base_of(module) as *const i64;
-                // If the address isn't within the defined modules space, remove it.
-                return *res >= base_address;
-            }
-
-            true
-        });
-
-        results
+        Memory::pattern_scan(module, handle, sig, include_executable).dynamic_expect(zencstr!(
+            "[ERROR] Scan failed while looking for ",
+            Self::bytes_to_hex_string(sig)
+        ))
     }
 
     /// Checks if the given key is being held down.

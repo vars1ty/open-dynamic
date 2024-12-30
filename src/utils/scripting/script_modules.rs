@@ -406,11 +406,10 @@ impl SystemModules {
     }
 
     /// Scans for a pattern in memory.
-    fn pattern_scan(hex_string: String, address_type: AddressType) -> Vec<i64> {
+    fn pattern_scan(module: &str, hex_string: String) -> Vec<i64> {
         let ptr = hex_string.as_ptr();
         WinUtils::find_from_signature(
-            address_type,
-            None,
+            module,
             &StringUtils::hex_string_to_bytes(hex_string)
                 .unwrap_or_crash(zencstr!("[ERROR] Failed converting hex string into bytes!")),
             true,
