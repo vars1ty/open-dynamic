@@ -1,5 +1,6 @@
 use super::{extensions::ResultExtensions, runedetour::COLLECT_PARAMS_COUNT};
 use crate::{
+    globals::CONTEXT_PTR,
     utils::extensions::OptionExt,
     winutils::{Renderer, WinUtils},
 };
@@ -199,7 +200,7 @@ impl Config {
     }
 
     /// Loads the colors from the specified file into the current UI context.
-    pub fn load_colors_from_file(&self, ctx: &mut hudhook::imgui::Context, name: &str) {
+    pub fn load_colors_from_file(&self, name: &str) {
         if name.is_empty() {
             log!("[ERROR] File name cannot be empty!");
             return;
@@ -209,6 +210,15 @@ impl Config {
         if !self.get_file_content(name, &mut content) {
             return;
         }
+
+        let context_ptr = CONTEXT_PTR.load(Ordering::Relaxed);
+        if context_ptr == 0 {
+            log!("[ERROR] ImGui context hasn't been initialized!");
+            return;
+        }
+
+        let ctx: &mut hudhook::imgui::Context =
+            unsafe { &mut *(context_ptr as *mut hudhook::imgui::Context) };
 
         let mut colors = ctx.style_mut().colors;
         for (i, line) in content.lines().enumerate() {

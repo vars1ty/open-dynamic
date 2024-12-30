@@ -161,7 +161,7 @@ impl CustomWindowsUtils {
         }
 
         let last_colors = ctx.style_mut().colors;
-        config.load_colors_from_file(ctx, &preset);
+        config.load_colors_from_file(&preset);
 
         Some(last_colors)
     }

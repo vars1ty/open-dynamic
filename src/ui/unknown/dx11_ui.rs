@@ -54,10 +54,6 @@ pub struct DX11UI {
 
     /// UI Colors preset input field.
     ui_colors_preset: String,
-
-    /// If `true`, the defined preset from `ui_colors_preset` will be loaded next frame.
-    #[deprecated = "CONTEXT_PTR is safe for modifying colors, no need for this."]
-    load_colors_on_next_frame: bool,
 }
 
 impl DX11UI {
@@ -89,7 +85,6 @@ impl DX11UI {
             invalid_textures: Vec::with_capacity(4),
             default_style: Style::default(),
             ui_colors_preset: String::default(),
-            load_colors_on_next_frame: false,
         }
     }
 
@@ -304,20 +299,19 @@ impl DX11UI {
         );
     }
 
-    /// If `self.load_colors_on_next_frame` is `true`, then the color preset from `self.ui_colors_preset` is loaded.
-    fn load_ui_colors_preset(&mut self, ctx: &mut Context) {
-        if !self.load_colors_on_next_frame {
+    /// Loads the UI Colors preset from `self.ui_colors_preset`.
+    fn load_ui_colors_preset(&mut self) {
+        if self.ui_colors_preset.is_empty() {
             return;
         }
 
-        self.load_colors_on_next_frame = false;
         let base_core_reader = self
             .base_core
             .try_read()
             .unwrap_or_crash(zencstr!("[ERROR] BaseCore is locked!"));
         base_core_reader
             .get_config()
-            .load_colors_from_file(ctx, &self.ui_colors_preset);
+            .load_colors_from_file(&self.ui_colors_preset);
         self.ui_colors_preset.clear();
     }
 
@@ -328,7 +322,6 @@ impl DX11UI {
             ColorUtils::rgba_to_frgba([255, 105, 0, 255]),
         );
         label!(ui, "󱇎 Warning: Text Color on buttons and alike isn't directly derived from the UI Stylesheet, and is instead programmed into dynamic.");
-        label!(ui, "󱇎 Warning: Save and Load isn't yet implemented, this is just a preview and lack features.");
         text_color.pop();
     }
 }
@@ -362,7 +355,6 @@ impl ImguiRenderLoop for DX11UI {
     ) {
         CONTEXT_PTR.store(std::ptr::addr_of!(_ctx) as i64, Ordering::Relaxed);
         self.load_unitialized_textures(_render_context);
-        self.load_ui_colors_preset(_ctx);
     }
 
     /// Renders the UI.
@@ -486,7 +478,7 @@ impl ImguiRenderLoop for DX11UI {
                         ui.same_line();
 
                         if button!(ui, "󰦗 Load") {
-                            self.load_colors_on_next_frame = true;
+                            self.load_ui_colors_preset();
                         }
                     } else {
                         text_color.pop();
