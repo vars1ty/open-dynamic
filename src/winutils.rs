@@ -6,7 +6,6 @@ use crate::{
     },
 };
 use ahash::AHashMap;
-use rune::Any;
 use std::{ffi::*, os::windows::prelude::OsStringExt};
 use windows::{
     core::PCSTR,
@@ -37,16 +36,6 @@ pub enum Renderer {
 
     #[default]
     None,
-}
-
-/// Address types.
-#[derive(PartialEq, Eq, Any)]
-pub enum AddressType {
-    #[rune(constructor)]
-    Static,
-
-    #[rune(constructor)]
-    Any,
 }
 
 /// Windows utilities.
@@ -154,7 +143,6 @@ impl WinUtils {
     }
 
     /// Finds an address by its signature, `0x7F` is for wildcards.
-    /// `module` is only relevant when using `AddressType::Static`.
     #[optimize(speed)]
     pub fn find_from_signature(
         module: &str,

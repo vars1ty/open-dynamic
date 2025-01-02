@@ -20,8 +20,8 @@ impl StringUtils {
     }
 
     /// Converts a hex string to its byte-slice representation.
-    pub fn hex_string_to_bytes(hex_string: String) -> Option<Vec<u8>> {
-        let hex_string = hex_string.to_owned().replace(' ', "").replace("??", "7F");
+    pub fn hex_string_to_bytes(mut hex_string: String) -> Option<Vec<u8>> {
+        hex_string = hex_string.replace(' ', "").replace("??", "7F");
         if hex_string.len() % 2 != 0 {
             log!(
                 "[ERROR] Hex string must be even (hex_string.len() % 2 == 0 FAILED). String failing: \"",

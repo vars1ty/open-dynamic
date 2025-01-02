@@ -217,8 +217,7 @@ impl ScriptCore {
             self.exec_main(source, crosscom, send_src_to_network, use_new_thread);
             log!(
                 "[Script Engine] Script compiled in ",
-                start.elapsed().as_millis(),
-                "ms!"
+                format!("{:.2?}!", start.elapsed())
             );
             return;
         }
@@ -277,6 +276,7 @@ impl ScriptCore {
             log!("[Script Engine] Running script on a new thread...");
             std::thread::spawn(move || {
                 code();
+                log!("[Script Engine] Script finished executing!");
             });
             return;
         }

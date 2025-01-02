@@ -14,7 +14,7 @@ use crate::{
         stringutils::StringUtils,
         ui::customwindows::CustomWindowsUtils,
     },
-    winutils::{AddressType, WinUtils},
+    winutils::WinUtils,
 };
 use dashmap::DashMap;
 use parking_lot::RwLock;
@@ -65,7 +65,6 @@ impl SystemModules {
         let mut mutex_module = Module::with_crate(&zencstr!("Mutex").data)?;
 
         module.ty::<RuneDoubleResultPrimitive>()?;
-        module.ty::<AddressType>()?;
         module.ty::<MutexValue>()?;
 
         mutex_module.function("new", MutexValue::new).build()?;
@@ -332,6 +331,16 @@ impl SystemModules {
             .build()?;
         std_module
             .function("free", |ptr: i64| unsafe {
+                if ptr == 0 {
+                    log!("[ERROR] std::free called with a nullptr!");
+                    return;
+                }
+
+                if ptr < 0 {
+                    log!("[ERROR] std::free called with a negative pointer!");
+                    return;
+                }
+
                 libc::free(ptr as *mut _);
             })
             .build()?;
@@ -378,8 +387,8 @@ impl SystemModules {
     /// Runs a defined function on a new thread. This is especially useful when the user doesn't
     /// want to block the main thread, or the already newly-created thread from the special
     /// compiler option.
-    fn run_multi_threaded(function: Function, arg1: Option<Value>) {
-        let arg1 = arg1.map(ValueWrapper);
+    fn run_multi_threaded(function: Function, opt_param: Option<Value>) {
+        let opt_param = opt_param.map(ValueWrapper);
         let function = function
             .into_sync()
             .into_result()
@@ -387,7 +396,7 @@ impl SystemModules {
 
         std::thread::spawn(move || {
             let Err(error) = function
-                .call::<_, ()>((arg1.map(|value| value.0),))
+                .call::<_, ()>((opt_param.map(|value| value.0),))
                 .into_result()
             else {
                 return;
