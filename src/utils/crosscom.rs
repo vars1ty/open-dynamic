@@ -433,8 +433,7 @@ impl CrossCom {
         &self.startup_channel
     }
 
-    /// Joins a new channel, leaving `channel` as-is since it's the startup value.
-    /// No `&self` as it causes deadlocks.
+    /// Tries to join the specified channel.
     pub fn join_channel(&self, channel: &str) {
         if self.has_pending_channel_update.load(Ordering::Relaxed) {
             log!("[ERROR] You are already in the process of joining a channel, be patient!");
@@ -520,7 +519,7 @@ impl CrossCom {
         }
     }
 
-    /// Gets the current channel. Do **not** modify it as-is, use `join_channel`!
+    /// Gets the current channel. Do **not** modify it as-is, use `self.join_channel()`!
     pub const fn get_current_channel(&self) -> &RefCell<String> {
         &self.current_channel
     }

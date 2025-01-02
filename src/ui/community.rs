@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use hudhook::imgui::{self};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use std::{cell::RefCell, sync::Arc};
 
 /// Community-published item data.
@@ -28,7 +28,7 @@ pub struct CommunityWindow {
     base_core: Arc<RwLock<BaseCore>>,
 
     /// Community item data.
-    community_scripts: Arc<Mutex<Vec<CommunityItem>>>,
+    community_scripts: Vec<CommunityItem>,
 
     content_frame_data: RefCell<ContentFrameData>,
 
@@ -42,19 +42,15 @@ impl CommunityWindow {
     /// Initializes the window.
     pub fn init(base_core: Arc<RwLock<BaseCore>>) -> Self {
         let base_core_clone = Arc::clone(&base_core);
-        let community_scripts = Arc::new(Mutex::new(Vec::new()));
-        let community_scripts_clone = Arc::clone(&community_scripts);
 
         // Request content in a new task, since we don't want to block the main thread.
-        std::thread::spawn(move || {
-            log!("Requesting community content...");
-            *community_scripts_clone.lock() = base_core_clone
-                .read()
-                .get_crosscom()
-                .read()
-                .get_community_content();
-            log!("Community content received!");
-        });
+        log!("[INFO] Requesting community content...");
+        let community_scripts = base_core_clone
+            .read()
+            .get_crosscom()
+            .read()
+            .get_community_content();
+        log!("[INFO] Community content received!");
 
         Self {
             base_core,
@@ -73,7 +69,7 @@ impl CommunityWindow {
             Some(30.0),
             || {
                 let Some(font) = ImGuiUtils::activate_font(ui, 1) else {
-                    log!("[ERROR] Failed activating a dynamic pre-installed font at index 1!");
+                    log!("[ERROR] Failed activating a pre-installed font at index 1!");
                     return;
                 };
 
@@ -83,11 +79,7 @@ impl CommunityWindow {
         );
 
         ui.columns(3, zencstr!("ViewColumn"), false);
-        let Some(community_scripts) = self.community_scripts.try_lock() else {
-            return;
-        };
-
-        for item_data in &*community_scripts {
+        for item_data in &*self.community_scripts {
             ImGuiUtils::draw_content_frame(
                 ui,
                 &item_data.name,
