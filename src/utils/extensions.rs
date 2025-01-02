@@ -63,7 +63,10 @@ impl<T, E> ResultExtensions<T, E> for Result<T, E> {
     {
         match self {
             Ok(value) => value,
-            Err(error) => crash!("[ERROR] Tried to unwrap a `None` value, error: ", error),
+            Err(error) => crash!(
+                "[ERROR] Tried to unwrap an `Err(...)` value when expecting `Ok(...)`, error: ",
+                error
+            ),
         }
     }
 

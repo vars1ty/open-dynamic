@@ -57,7 +57,7 @@ impl WinUtils {
                 crash!(
                     "[ERROR] Failed retrieving path to the \"",
                     name,
-                    "\" module, size returned by GetModuleFileNameW was 0!"
+                    "\" module, size returned by GetModuleFileNameA was 0!"
                 );
             }
 
