@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use ahash::AHashMap;
-use std::{ffi::*, os::windows::prelude::OsStringExt};
+use std::ffi::*;
 use windows::{
     core::PCSTR,
     Win32::{
@@ -51,8 +51,8 @@ impl WinUtils {
                 "\""
             ));
 
-            let mut buffer: [u16; MAX_PATH as _] = [0; MAX_PATH as _];
-            let size = GetModuleFileNameW(dll_handle, &mut buffer);
+            let mut buffer = [0u8; MAX_PATH as _];
+            let size = GetModuleFileNameA(dll_handle, &mut buffer);
             if size == 0 {
                 crash!(
                     "[ERROR] Failed retrieving path to the \"",
@@ -62,11 +62,8 @@ impl WinUtils {
             }
 
             ZString::new(
-                OsString::from_wide(&buffer[..size as _])
-                    .into_string()
-                    .unwrap_or_else(|error| {
-                        crash!("[ERROR] Failed to safely convert DLL path to a valid OsString, error: ", format!("{error:?}"))
-                    }),
+                String::from_utf8(buffer[..size as _].to_vec())
+                    .dynamic_expect(zencstr!("Failed to safely convert DLL path to a valid UTF-8 String")),
             )
         }
     }
