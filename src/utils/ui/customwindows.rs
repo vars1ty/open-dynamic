@@ -12,12 +12,7 @@ use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use rune::{alloc::clone::TryClone, runtime::SyncFunction, Value};
 use std::collections::HashMap;
-use std::{
-    cell::Cell,
-    rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Arc,
-};
+use std::{cell::Cell, rc::Rc, sync::atomic::Ordering, sync::Arc};
 use windows::Win32::Foundation::POINT;
 use zstring::ZString;
 
@@ -46,14 +41,11 @@ enum CallbackType {
 #[derive(Default)]
 pub struct CustomWindowsUtils {
     /// Titles for each custom window.
-    window_titles: RwLock<Vec<String>>,
+    window_titles: AtomicRefCell<Vec<String>>,
 
     /// Widgets for each window.
     #[allow(clippy::type_complexity)] // Ignore because it's complex.
     window_widgets: DashMap<usize, WidgetsMap>,
-
-    /// Current window index to be used for modifications.
-    current_window_index: AtomicUsize,
 
     /// Window size constraints.
     window_size_constraints: Mutex<Vec<[f32; 4]>>,
@@ -95,7 +87,7 @@ impl CustomWindowsUtils {
         let config = base_core_reader.get_config();
         drop(base_core_reader);
 
-        let Some(window_titles) = self.window_titles.try_read() else {
+        let Ok(window_titles) = self.window_titles.try_borrow() else {
             return;
         };
 
@@ -138,6 +130,10 @@ impl CustomWindowsUtils {
                 self.restore_preset_to_default(default_style);
             }
         }
+
+        // Drop RwLock and Mutex so UI Builder is properly available in callbacks.
+        drop(window_titles);
+        drop(window_size_constraints);
 
         self.call_pending_callbacks();
     }
@@ -558,7 +554,7 @@ impl CustomWindowsUtils {
 
     /// Attempts to get the index of `window` from `self.window_titles`.
     fn get_index_for_window(&self, window: &str) -> Option<usize> {
-        let Some(window_titles) = self.window_titles.try_read() else {
+        let Ok(window_titles) = self.window_titles.try_borrow() else {
             log!("[ERROR] Window titles is locked, cannot call get_index_for_window!");
             return None;
         };
@@ -579,23 +575,15 @@ impl CustomWindowsUtils {
             .map(|(index, _)| index)
     }
 
-    /// Changes the currently selected window.
-    pub fn set_current_window_to(&self, window: String) {
-        let Some(index) = self.get_index_for_window(&window) else {
-            log!("[ERROR] No window named \"", window, "\" was found!");
-            return;
-        };
-
-        self.current_window_index.store(index, Ordering::Relaxed);
-    }
-
     /// Adds a new custom window.
     pub fn add_window(&self, title: String) {
-        let Some(mut window_titles) = self.window_titles.try_write() else {
+        let Ok(window_titles) = self.window_titles.try_borrow() else {
+            log!("[ERROR] Tried to access window titles when its in use, cancelled!");
             return;
         };
 
         let Some(mut window_size_constraints) = self.window_size_constraints.try_lock() else {
+            log!("[ERROR] Tried to add window when window size constraints is locked and in use, cancelled!");
             return;
         };
 
@@ -608,6 +596,12 @@ impl CustomWindowsUtils {
             return;
         }
 
+        drop(window_titles);
+        let Ok(mut window_titles) = self.window_titles.try_borrow_mut() else {
+            log!("[ERROR] Tried to add window into window titles when it's in use, cancelled!");
+            return;
+        };
+
         window_titles.push(title);
         window_size_constraints.push([0.0, 0.0, 9999.0, 9999.0]);
 
@@ -616,21 +610,21 @@ impl CustomWindowsUtils {
     }
 
     /// Attempts to remove a custom window.
-    pub fn remove_window(&self, title: String) {
+    pub fn remove_window(&self, window: String) {
         let Some(mut window_size_constraints) = self.window_size_constraints.try_lock() else {
             log!("[ERROR] Window size constraints is locked, cannot access as mutable!");
             return;
         };
 
-        let Some(index) = self.get_index_for_window(&title) else {
-            log!("[ERROR] No window named \"", title, "\" was found!");
+        let Some(index) = self.get_index_for_window(&window) else {
+            log!("[ERROR] No window named \"", window, "\" was found!");
             return;
         };
 
-        let Some(mut window_titles) = self.window_titles.try_write() else {
+        let Ok(mut window_titles) = self.window_titles.try_borrow_mut() else {
             log!(
                 "[ERROR] Window titles is locked, cannot remove \"",
-                title,
+                window,
                 "\"!"
             );
             return;
@@ -639,15 +633,11 @@ impl CustomWindowsUtils {
         self.window_widgets.remove(&index);
         window_titles.remove(index);
         window_size_constraints.remove(index);
-
-        if self.current_window_index.load(Ordering::Relaxed) == index {
-            self.current_window_index.store(0, Ordering::Relaxed);
-        }
     }
 
     /// Attempts to rename a custom window.
     pub fn rename_window(&self, from: String, to: String) {
-        let Some(mut window_titles) = self.window_titles.try_write() else {
+        let Ok(window_titles) = self.window_titles.try_borrow() else {
             log!(
                 "[ERROR] Window titles is locked, cannot rename \"",
                 from,
@@ -675,6 +665,18 @@ impl CustomWindowsUtils {
             return;
         }
 
+        drop(window_titles);
+        let Ok(mut window_titles) = self.window_titles.try_borrow_mut() else {
+            log!(
+                "[ERROR] Window titles is locked, cannot rename \"",
+                from,
+                "\" into \"",
+                to,
+                "\"!"
+            );
+            return;
+        };
+
         let Some(window_title) = window_titles
             .iter_mut()
             .find(|window_title| **window_title == from)
@@ -686,7 +688,7 @@ impl CustomWindowsUtils {
     }
 
     /// Adds a widget to the currently selected custom window.
-    pub fn add_widget(&self, mut identifier: String, widget_type: WidgetType) {
+    pub fn add_widget(&self, window: &str, mut identifier: String, widget_type: WidgetType) {
         if identifier.is_empty() {
             // Empty identifier, use a "random" string.
             // Identifier should really be an Option<String>, but that's reserved for the future if
@@ -694,9 +696,12 @@ impl CustomWindowsUtils {
             identifier = StringUtils::get_random();
         }
 
-        let window_widgets = self
-            .window_widgets
-            .try_get_mut(&self.current_window_index.load(Ordering::Relaxed));
+        let Some(window_index) = self.get_index_for_window(window) else {
+            log!("[ERROR] Couldn't find any window named \"", window, "\"!");
+            return;
+        };
+
+        let window_widgets = self.window_widgets.try_get_mut(&window_index);
         if window_widgets.is_locked() {
             log!("[ERROR] Window widgets is locked, no new widgets can be added to the active window!");
             return;
@@ -798,10 +803,13 @@ impl CustomWindowsUtils {
     }
 
     /// Removes a widget from the currently selected custom window.
-    pub fn remove_widget(&self, identifier: String) {
-        let window_widgets = self
-            .window_widgets
-            .try_get_mut(&self.current_window_index.load(Ordering::Relaxed));
+    pub fn remove_widget(&self, window: &str, identifier: String) {
+        let Some(window_index) = self.get_index_for_window(window) else {
+            log!("[ERROR] Couldn't find any window named \"", window, "\"!");
+            return;
+        };
+
+        let window_widgets = self.window_widgets.try_get_mut(&window_index);
         if window_widgets.is_locked() {
             log!("[ERROR] Window widgets is locked, no widgets can be removed!");
             return;
@@ -822,10 +830,13 @@ impl CustomWindowsUtils {
     }
 
     /// Removes all widgets from the currently selected window.
-    pub fn remove_all_widgets(&self) {
-        let window_widgets = self
-            .window_widgets
-            .try_get_mut(&self.current_window_index.load(Ordering::Relaxed));
+    pub fn remove_all_widgets(&self, window: &str) {
+        let Some(window_index) = self.get_index_for_window(window) else {
+            log!("[ERROR] Couldn't find any window named \"", window, "\"!");
+            return;
+        };
+
+        let window_widgets = self.window_widgets.try_get_mut(&window_index);
         if window_widgets.is_locked() {
             log!("[ERROR] Window widgets is locked, no widgets can be removed from the active window!");
             return;
@@ -839,10 +850,17 @@ impl CustomWindowsUtils {
     }
 
     /// Gets a widget from a specific window.
-    pub fn get_widget(&self, identifier: &str) -> Option<Arc<AtomicRefCell<WidgetType>>> {
-        let window_widgets = self
-            .window_widgets
-            .try_get(&self.current_window_index.load(Ordering::Relaxed));
+    pub fn get_widget(
+        &self,
+        window: &str,
+        identifier: &str,
+    ) -> Option<Arc<AtomicRefCell<WidgetType>>> {
+        let Some(window_index) = self.get_index_for_window(window) else {
+            log!("[ERROR] Couldn't find any window named \"", window, "\"!");
+            return None;
+        };
+
+        let window_widgets = self.window_widgets.try_get(&window_index);
         if window_widgets.is_locked() {
             log!("[ERROR] Window widgets is locked, no widgets can be pulled from the active window!");
             return None;
@@ -879,13 +897,14 @@ impl CustomWindowsUtils {
             return Some(Arc::clone(widget));
         }
 
+        log!("[ERROR] There is no widget named \"", identifier, "\"!");
         None
     }
 
     /// Tries to update the text of an existing label.
     /// TODO: Make work on any widget with a label.
-    pub fn update_label(&self, identifier: String, new_text: String) {
-        let Some(widget) = self.get_widget(&identifier) else {
+    pub fn update_label(&self, window: &str, identifier: String, new_text: String) {
+        let Some(widget) = self.get_widget(window, &identifier) else {
             log!("[ERROR] There are no widgets named \"", identifier, "\"!");
             return;
         };
@@ -914,9 +933,9 @@ impl CustomWindowsUtils {
 
     /// Attempts to get the value of a f32-slider in the currently-active window.
     #[deprecated = "Requires UI focus, replaced with callbacks."]
-    pub fn get_f32_slider_value(&self, identifier: String) -> Option<f32> {
+    pub fn get_f32_slider_value(&self, window: &str, identifier: String) -> Option<f32> {
         let WidgetType::F32Slider(_, _, _, current_value, _, _) =
-            *self.get_widget(&identifier)?.borrow()
+            *self.get_widget(window, &identifier)?.borrow()
         else {
             return None;
         };
@@ -926,9 +945,9 @@ impl CustomWindowsUtils {
 
     /// Attempts to get the value of a i32-slider in the currently-active window.
     #[deprecated = "Requires UI focus, replaced with callbacks."]
-    pub fn get_i32_slider_value(&self, identifier: String) -> Option<i32> {
+    pub fn get_i32_slider_value(&self, window: &str, identifier: String) -> Option<i32> {
         let WidgetType::I32Slider(_, _, _, current_value, _, _) =
-            *self.get_widget(&identifier)?.borrow()
+            *self.get_widget(window, &identifier)?.borrow()
         else {
             return None;
         };
@@ -938,8 +957,12 @@ impl CustomWindowsUtils {
 
     /// Attempts to get the value of a i32-slider in the currently-active window.
     #[deprecated = "Requires UI focus, replaced with callbacks."]
-    pub fn get_input_text_multiline_value(&self, identifier: String) -> Option<String> {
-        let widget = self.get_widget(&identifier)?;
+    pub fn get_input_text_multiline_value(
+        &self,
+        window: &str,
+        identifier: String,
+    ) -> Option<String> {
+        let widget = self.get_widget(window, &identifier)?;
         let WidgetType::InputTextMultiLine(_, input, _, _, _, _) = &*widget.borrow() else {
             return None;
         };
@@ -948,11 +971,13 @@ impl CustomWindowsUtils {
     }
 
     /// Sets the window constraints for the currently focused window.
-    pub fn set_active_window_size_constraints(&self, constraints: [f32; 4]) {
-        if let Some(active_constraints) = self
-            .window_size_constraints
-            .lock()
-            .get_mut(self.current_window_index.load(Ordering::Relaxed))
+    pub fn set_window_size_constraints(&self, window: &str, constraints: [f32; 4]) {
+        let Some(window_index) = self.get_index_for_window(window) else {
+            log!("[ERROR] Couldn't find any window named \"", window, "\"!");
+            return;
+        };
+
+        if let Some(active_constraints) = self.window_size_constraints.lock().get_mut(window_index)
         {
             *active_constraints = constraints;
         }
@@ -1061,22 +1086,9 @@ impl CustomWindowsUtils {
         cached_texture.texture_id
     }
 
-    /// Tries to obtain the focused window name.
-    pub fn get_focused_window_name(&self) -> Option<String> {
-        self.window_titles
-            .try_read()?
-            .get(self.current_window_index.load(Ordering::Relaxed))
-            .cloned() // Lifetime issues, fix later if possible.
-    }
-
     /// Sets the UI Color preset for the focused window.
-    pub fn set_color_preset_for_focused(&self, preset: String) {
-        let Some(focused_window) = self.get_focused_window_name() else {
-            log!("[ERROR] No focused window, or window titles is busy!");
-            return;
-        };
-
-        self.window_color_presets.insert(focused_window, preset);
+    pub fn set_color_preset_for(&self, window: String, preset: String) {
+        self.window_color_presets.insert(window, preset);
     }
 
     /// Hides a set of widgets by their identifiers from all windows.
@@ -1108,15 +1120,22 @@ impl CustomWindowsUtils {
     /// Sets the name of the sub-widget to be used for adding all upcoming widgets, until set to
     /// `None` again.
     pub fn set_sub_widget_identifier(&self, focus: Option<String>) {
-        *self.add_into_sub_widget.borrow_mut() = focus;
+        let Ok(mut add_into_sub_widget) = self.add_into_sub_widget.try_borrow_mut() else {
+            log!("[ERROR] Cannot modify sub-widget identifier as it's already in use!");
+            return;
+        };
+
+        *add_into_sub_widget = focus;
     }
 
     /// Retains all widgets that have their identifier present in `identifiers`.
-    pub fn retain_widgets_by_identifiers(&self, identifiers: Vec<String>) {
-        let Some(mut window_widgets) = self
-            .window_widgets
-            .get_mut(&self.current_window_index.load(Ordering::Relaxed))
-        else {
+    pub fn retain_widgets_by_identifiers(&self, window: &str, identifiers: Vec<String>) {
+        let Some(window_index) = self.get_index_for_window(window) else {
+            log!("[ERROR] Couldn't find any window named \"", window, "\"!");
+            return;
+        };
+
+        let Some(mut window_widgets) = self.window_widgets.get_mut(&window_index) else {
             return;
         };
 

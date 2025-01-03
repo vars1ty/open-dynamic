@@ -44,9 +44,6 @@ pub struct DNXFunctions {
     /// `ui::add_window(name)` function. Allocates and displays a new custom window.
     ui_add_window: Box<dyn Fn(String) + Send + Sync>,
 
-    /// `ui::focus_window` function. Focuses the defined window if present.
-    ui_focus_window: Box<dyn Fn(String) + Send + Sync>,
-
     /// `Sellix::is_paying_for_product(product_id, bearer_tolen)` function. Checks if the user is
     /// paying for the specified Sellix product.
     sellix_is_paying_for_product: Box<dyn Fn(String, String) -> bool + Send + Sync>,
@@ -152,9 +149,6 @@ impl Arctic {
                     }),
                     ui_add_window: Box::new(move |name| {
                         custom_window_utils.add_window(name);
-                    }),
-                    ui_focus_window: Box::new(move |name| {
-                        custom_window_utils.set_current_window_to(name);
                     }),
                     sellix_is_paying_for_product: Box::new(move |product_id, bearer_token| {
                         crosscom_check_is_ex_serial_ok.read().check_is_ex_serial_ok(

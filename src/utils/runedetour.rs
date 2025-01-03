@@ -86,6 +86,11 @@ impl RDetour {
             detour_holder_07();
             detour_holder_08();
             detour_holder_09();
+            detour_holder_10();
+            detour_holder_11();
+            detour_holder_12();
+            detour_holder_13();
+            detour_holder_14();
         }
 
         #[cfg(target_pointer_width = "32")]
@@ -279,6 +284,11 @@ impl RDetour {
             7 => detour_holder_07 as *const (),
             8 => detour_holder_08 as *const (),
             9 => detour_holder_09 as *const (),
+            10 => detour_holder_10 as *const (),
+            11 => detour_holder_11 as *const (),
+            12 => detour_holder_12 as *const (),
+            13 => detour_holder_13 as *const (),
+            14 => detour_holder_14 as *const (),
             _ => crash!(
                 "[ERROR] RDetour at ID ",
                 self.get_detour_id(),
@@ -398,3 +408,8 @@ generate_detour_holder!(detour_holder_06, 6);
 generate_detour_holder!(detour_holder_07, 7);
 generate_detour_holder!(detour_holder_08, 8);
 generate_detour_holder!(detour_holder_09, 9);
+generate_detour_holder!(detour_holder_10, 10);
+generate_detour_holder!(detour_holder_11, 11);
+generate_detour_holder!(detour_holder_12, 12);
+generate_detour_holder!(detour_holder_13, 13);
+generate_detour_holder!(detour_holder_14, 14);

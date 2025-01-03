@@ -630,30 +630,37 @@ impl UIModules {
             .build()?;
 
         module
-            .function("focus_window", |name| {
-                custom_window_utils.set_current_window_to(name)
-            })
+            .function(
+                "add_label",
+                |(window_name, identifier): (String, String), content: String| {
+                    custom_window_utils.add_widget(
+                        &window_name,
+                        identifier,
+                        WidgetType::Label(ZString::new(content), 0),
+                    )
+                },
+            )
             .build()?;
 
         module
-            .function("add_label", |identifier, content: String| {
-                custom_window_utils
-                    .add_widget(identifier, WidgetType::Label(ZString::new(content), 0))
-            })
-            .build()?;
-
-        module
-            .function("add_bold_label", |identifier, content: String| {
-                custom_window_utils
-                    .add_widget(identifier, WidgetType::Label(ZString::new(content), 2));
-            })
+            .function(
+                "add_bold_label",
+                |(window_name, identifier): (String, String), content: String| {
+                    custom_window_utils.add_widget(
+                        &window_name,
+                        identifier,
+                        WidgetType::Label(ZString::new(content), 2),
+                    );
+                },
+            )
             .build()?;
 
         module
             .function(
                 "add_custom_font_label",
-                |identifier, content, relative_font_path| {
+                |(window_name, identifier): (String, String), content, relative_font_path| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier,
                         WidgetType::LabelCustomFont(content, Arc::new(relative_font_path)),
                     )
@@ -662,16 +669,20 @@ impl UIModules {
             .build()?;
 
         module
-            .function("update_label", |identifier, new_text| {
-                custom_window_utils.update_label(identifier, new_text)
-            })
+            .function(
+                "update_label",
+                |(window_name, identifier): (String, String), new_text| {
+                    custom_window_utils.update_label(&window_name, identifier, new_text)
+                },
+            )
             .build()?;
 
         module
             .function(
                 "add_button",
-                |identifier: String, text: String, function, opt_param| {
+                |(window_name, identifier): (String, String), text: String, function, opt_param| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::Button(
                             ZString::new(text),
@@ -684,26 +695,34 @@ impl UIModules {
             .build()?;
 
         module
-            .function("add_separator", |identifier| {
-                custom_window_utils.add_widget(identifier, WidgetType::Separator)
-            })
-            .build()?;
-
-        module
-            .function("add_spacing", |identifier, x, y| {
-                custom_window_utils.add_widget(identifier, WidgetType::Spacing(x, y))
+            .function("add_separator", |window_name: &str, identifier| {
+                custom_window_utils.add_widget(window_name, identifier, WidgetType::Separator)
             })
             .build()?;
 
         module
             .function(
+                "add_spacing",
+                |(window_name, identifier): (String, String), x, y| {
+                    custom_window_utils.add_widget(
+                        &window_name,
+                        identifier,
+                        WidgetType::Spacing(x, y),
+                    )
+                },
+            )
+            .build()?;
+
+        module
+            .function(
                 "add_f32_slider",
-                |identifier: String,
+                |(window_name, identifier): (String, String),
                  text: String,
                  (min, max, default_value),
                  function,
                  opt_param| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::F32Slider(
                             ZString::new(text),
@@ -721,12 +740,13 @@ impl UIModules {
         module
             .function(
                 "add_i32_slider",
-                |identifier: String,
+                |(window_name, identifier): (String, String),
                  text: String,
                  (min, max, default_value),
                  function,
                  opt_param| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::I32Slider(
                             ZString::new(text),
@@ -742,46 +762,61 @@ impl UIModules {
             .build()?;
 
         module
-            .function("get_f32_slider_value", |identifier| {
-                custom_window_utils.get_f32_slider_value(identifier)
+            .function("get_f32_slider_value", |window_name: &str, identifier| {
+                custom_window_utils.get_f32_slider_value(window_name, identifier)
             })
             .build()?;
 
         module
-            .function("get_i32_slider_value", |identifier| {
-                custom_window_utils.get_i32_slider_value(identifier)
+            .function("get_i32_slider_value", |window_name: &str, identifier| {
+                custom_window_utils.get_i32_slider_value(window_name, identifier)
             })
             .build()?;
 
         module
-            .function("remove_widget", |identifier| {
-                custom_window_utils.remove_widget(identifier)
+            .function("remove_widget", |window_name: &str, identifier| {
+                custom_window_utils.remove_widget(window_name, identifier)
             })
             .build()?;
 
         module
-            .function("remove_all_widgets", || {
-                custom_window_utils.remove_all_widgets()
-            })
-            .build()?;
-
-        module
-            .function("set_next_item_width", |identifier, width| {
-                custom_window_utils.add_widget(identifier, WidgetType::NextWidgetWidth(width))
-            })
-            .build()?;
-
-        module
-            .function("set_next_item_same_line", |identifier| {
-                custom_window_utils.add_widget(identifier, WidgetType::SameLine)
+            .function("remove_all_widgets", |window_name: &str| {
+                custom_window_utils.remove_all_widgets(window_name)
             })
             .build()?;
 
         module
             .function(
-                "add_image",
-                |identifier: String, image_path, (width, height), callback, opt_param| {
+                "set_next_item_width",
+                |(window_name, identifier): (String, String), width| {
                     custom_window_utils.add_widget(
+                        &window_name,
+                        identifier,
+                        WidgetType::NextWidgetWidth(width),
+                    )
+                },
+            )
+            .build()?;
+
+        module
+            .function(
+                "set_next_item_same_line",
+                |window_name: &str, identifier| {
+                    custom_window_utils.add_widget(window_name, identifier, WidgetType::SameLine)
+                },
+            )
+            .build()?;
+
+        module
+            .function(
+                "add_image",
+                |(window_name, identifier): (String, String),
+                 image_path,
+                 (width, height),
+                 callback,
+                 opt_param| {
+                    custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::Image(
                             image_path,
@@ -801,8 +836,13 @@ impl UIModules {
         module
             .function(
                 "add_image_overlay",
-                |identifier: String, image_path, (width, height), callback, opt_param| {
+                |(window_name, identifier): (String, String),
+                 image_path,
+                 (width, height),
+                 callback,
+                 opt_param| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::Image(
                             image_path,
@@ -822,8 +862,9 @@ impl UIModules {
         module
             .function(
                 "add_image_background",
-                |identifier: String, image_path, (width, height)| {
+                |(window_name, identifier): (String, String), image_path, (width, height)| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::Image(
                             image_path,
@@ -850,9 +891,13 @@ impl UIModules {
             .build()?;
 
         module
-            .function("set_size_constraints", |min_x, min_y, max_x, max_y| {
-                custom_window_utils.set_active_window_size_constraints([min_x, min_y, max_x, max_y])
-            })
+            .function(
+                "set_size_constraints",
+                |window_name: &str, min_x, min_y, max_x, max_y| {
+                    custom_window_utils
+                        .set_window_size_constraints(window_name, [min_x, min_y, max_x, max_y])
+                },
+            )
             .build()?;
 
         module
@@ -876,8 +921,13 @@ impl UIModules {
         module
             .function(
                 "add_input_text_multiline",
-                |identifier: String, label: String, (width, height), callback, opt_param| {
+                |(window_name, identifier): (String, String),
+                 label: String,
+                 (width, height),
+                 callback,
+                 opt_param| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::InputTextMultiLine(
                             ZString::new(label),
@@ -893,15 +943,21 @@ impl UIModules {
             .build()?;
 
         module
-            .function("get_input_text_multiline_value", |identifier| {
-                custom_window_utils.get_input_text_multiline_value(identifier)
-            })
+            .function(
+                "get_input_text_multiline_value",
+                |window_name: &str, identifier| {
+                    custom_window_utils.get_input_text_multiline_value(window_name, identifier)
+                },
+            )
             .build()?;
 
         module
-            .function("retain_widgets_by_identifiers", |identifiers| {
-                custom_window_utils.retain_widgets_by_identifiers(identifiers)
-            })
+            .function(
+                "retain_widgets_by_identifiers",
+                |window_name: &str, identifiers| {
+                    custom_window_utils.retain_widgets_by_identifiers(window_name, identifiers)
+                },
+            )
             .build()?;
 
         module
@@ -911,19 +967,22 @@ impl UIModules {
             .build()?;
 
         module
-            .function("has_widget", |identifier: String| {
-                custom_window_utils.get_widget(&identifier).is_some()
+            .function("has_widget", |window_name: &str, identifier: &str| {
+                custom_window_utils
+                    .get_widget(window_name, identifier)
+                    .is_some()
             })
             .build()?;
 
         module
             .function(
                 "add_collapsing_section",
-                move |section_identifier: String,
+                move |(window_name, section_identifier): (String, String),
                       text: String,
                       call_once: Function,
                       opt_param: Option<Value>| {
                     Self::add_sub_widget(
+                        &window_name,
                         section_identifier,
                         SubWidgetType::CollapsingHeader(ZString::new(text)),
                         call_once,
@@ -937,12 +996,13 @@ impl UIModules {
         module
             .function(
                 "add_checkbox",
-                |identifier: String,
+                |(window_name, identifier): (String, String),
                  text: String,
                  checked,
                  on_value_changed: Function,
                  opt_param: Option<Value>| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::Checkbox(
                             ZString::new(text),
@@ -958,12 +1018,13 @@ impl UIModules {
         module
             .function(
                 "add_combobox",
-                |identifier: String,
+                |(window_name, identifier): (String, String),
                  text: String,
                  (items, selected_index),
                  on_value_changed: Function,
                  opt_param: Option<Value>| {
                     custom_window_utils.add_widget(
+                        &window_name,
                         identifier.to_owned(),
                         WidgetType::ComboBox(
                             ZString::new(text),
@@ -978,8 +1039,8 @@ impl UIModules {
             .build()?;
 
         module
-            .function("set_color_preset_for_focused", |preset| {
-                custom_window_utils.set_color_preset_for_focused(preset)
+            .function("set_color_preset_for", |window_name: String, preset| {
+                custom_window_utils.set_color_preset_for(window_name, preset)
             })
             .build()?;
 
@@ -997,6 +1058,7 @@ impl UIModules {
 
     /// Helper function for making it easier to add sub-widgets.
     fn add_sub_widget(
+        window_name: &str,
         section_identifier: String,
         sub_widget_type: SubWidgetType,
         call_once: Function,
@@ -1004,6 +1066,7 @@ impl UIModules {
         custom_window_utils: &'static CustomWindowsUtils,
     ) {
         custom_window_utils.add_widget(
+            window_name,
             section_identifier.to_owned(),
             WidgetType::SubWidget(
                 sub_widget_type,
