@@ -48,7 +48,7 @@ pub struct CustomWindowsUtils {
     window_widgets: DashMap<usize, WidgetsMap>,
 
     /// Window size constraints.
-    window_size_constraints: Mutex<Vec<[f32; 4]>>,
+    window_size_constraints: AtomicRefCell<Vec<Arc<[f32; 4]>>>,
 
     /// Cached GPU TextureIds, key being the path to the image.
     cached_images: RwLock<HashMap<String, CustomTexture>>,
@@ -91,10 +91,6 @@ impl CustomWindowsUtils {
             return;
         };
 
-        let Some(window_size_constraints) = self.window_size_constraints.try_lock() else {
-            return;
-        };
-
         static DEFAULT_SIZE: [f32; 2] = [600.0, 200.0];
 
         for (index, custom_window) in window_titles.iter().enumerate() {
@@ -109,9 +105,16 @@ impl CustomWindowsUtils {
                 continue;
             };
 
+            let Ok(window_size_constraints) = self.window_size_constraints.try_borrow() else {
+                return;
+            };
+
             let Some(size_constraints) = window_size_constraints.get(index) else {
                 continue;
             };
+
+            let size_constraints = Arc::clone(size_constraints);
+            drop(window_size_constraints);
 
             let default_style = self.activate_color_preset_for_window(custom_window, config);
             ui.window(&**custom_window)
@@ -131,9 +134,8 @@ impl CustomWindowsUtils {
             }
         }
 
-        // Drop RwLock and Mutex so UI Builder is properly available in callbacks.
+        // Drop RwLock so UI Builder is properly available in callbacks.
         drop(window_titles);
-        drop(window_size_constraints);
 
         self.call_pending_callbacks();
     }
@@ -582,7 +584,7 @@ impl CustomWindowsUtils {
             return;
         };
 
-        let Some(mut window_size_constraints) = self.window_size_constraints.try_lock() else {
+        let Ok(mut window_size_constraints) = self.window_size_constraints.try_borrow_mut() else {
             log!("[ERROR] Tried to add window when window size constraints is locked and in use, cancelled!");
             return;
         };
@@ -603,7 +605,7 @@ impl CustomWindowsUtils {
         };
 
         window_titles.push(title);
-        window_size_constraints.push([0.0, 0.0, 9999.0, 9999.0]);
+        window_size_constraints.push(Arc::new([0.0, 0.0, 9999.0, 9999.0]));
 
         let len = self.window_widgets.len();
         self.window_widgets.insert(len, Default::default());
@@ -611,11 +613,6 @@ impl CustomWindowsUtils {
 
     /// Attempts to remove a custom window.
     pub fn remove_window(&self, window: String) {
-        let Some(mut window_size_constraints) = self.window_size_constraints.try_lock() else {
-            log!("[ERROR] Window size constraints is locked, cannot access as mutable!");
-            return;
-        };
-
         let Some(index) = self.get_index_for_window(&window) else {
             log!("[ERROR] No window named \"", window, "\" was found!");
             return;
@@ -627,6 +624,11 @@ impl CustomWindowsUtils {
                 window,
                 "\"!"
             );
+            return;
+        };
+
+        let Ok(mut window_size_constraints) = self.window_size_constraints.try_borrow_mut() else {
+            log!("[ERROR] Window size constraints is locked, cannot access as mutable!");
             return;
         };
 
@@ -670,7 +672,7 @@ impl CustomWindowsUtils {
             log!(
                 "[ERROR] Window titles is locked, cannot rename \"",
                 from,
-                "\" into \"",
+                "\" to \"",
                 to,
                 "\"!"
             );
@@ -690,10 +692,9 @@ impl CustomWindowsUtils {
     /// Adds a widget to the currently selected custom window.
     pub fn add_widget(&self, window: &str, mut identifier: String, widget_type: WidgetType) {
         if identifier.is_empty() {
-            // Empty identifier, use a "random" string.
-            // Identifier should really be an Option<String>, but that's reserved for the future if
-            // anything due to compatibility reasons.
+            // Empty identifier, use a "random" string mixed with the pointer of identifier.
             identifier = StringUtils::get_random();
+            identifier.push_str(&(identifier.as_ptr() as i64).to_string());
         }
 
         let Some(window_index) = self.get_index_for_window(window) else {
@@ -703,7 +704,11 @@ impl CustomWindowsUtils {
 
         let window_widgets = self.window_widgets.try_get_mut(&window_index);
         if window_widgets.is_locked() {
-            log!("[ERROR] Window widgets is locked, no new widgets can be added to the active window!");
+            log!(
+                "[ERROR] Window widgets is locked, no widgets can be added to \"",
+                window,
+                "\"!"
+            );
             return;
         }
 
@@ -811,7 +816,11 @@ impl CustomWindowsUtils {
 
         let window_widgets = self.window_widgets.try_get_mut(&window_index);
         if window_widgets.is_locked() {
-            log!("[ERROR] Window widgets is locked, no widgets can be removed!");
+            log!(
+                "[ERROR] Window widgets is locked, no widgets can be removed from \"",
+                window,
+                "\"!"
+            );
             return;
         }
 
@@ -838,7 +847,11 @@ impl CustomWindowsUtils {
 
         let window_widgets = self.window_widgets.try_get_mut(&window_index);
         if window_widgets.is_locked() {
-            log!("[ERROR] Window widgets is locked, no widgets can be removed from the active window!");
+            log!(
+                "[ERROR] Window widgets is locked, no widgets can be removed from \"",
+                window,
+                "\"!"
+            );
             return;
         }
 
@@ -862,7 +875,11 @@ impl CustomWindowsUtils {
 
         let window_widgets = self.window_widgets.try_get(&window_index);
         if window_widgets.is_locked() {
-            log!("[ERROR] Window widgets is locked, no widgets can be pulled from the active window!");
+            log!(
+                "[ERROR] Window widgets is locked, no widgets can be pulled from \"",
+                window,
+                "\"!"
+            );
             return None;
         }
 
@@ -931,8 +948,7 @@ impl CustomWindowsUtils {
         }
     }
 
-    /// Attempts to get the value of a f32-slider in the currently-active window.
-    #[deprecated = "Requires UI focus, replaced with callbacks."]
+    /// Attempts to get the value of a f32-slider from the defined window.
     pub fn get_f32_slider_value(&self, window: &str, identifier: String) -> Option<f32> {
         let WidgetType::F32Slider(_, _, _, current_value, _, _) =
             *self.get_widget(window, &identifier)?.borrow()
@@ -943,8 +959,7 @@ impl CustomWindowsUtils {
         Some(current_value)
     }
 
-    /// Attempts to get the value of a i32-slider in the currently-active window.
-    #[deprecated = "Requires UI focus, replaced with callbacks."]
+    /// Attempts to get the value of a i32-slider from the defined window.
     pub fn get_i32_slider_value(&self, window: &str, identifier: String) -> Option<i32> {
         let WidgetType::I32Slider(_, _, _, current_value, _, _) =
             *self.get_widget(window, &identifier)?.borrow()
@@ -955,8 +970,7 @@ impl CustomWindowsUtils {
         Some(current_value)
     }
 
-    /// Attempts to get the value of a i32-slider in the currently-active window.
-    #[deprecated = "Requires UI focus, replaced with callbacks."]
+    /// Attempts to get the value of a i32-slider from the defined window.
     pub fn get_input_text_multiline_value(
         &self,
         window: &str,
@@ -977,9 +991,13 @@ impl CustomWindowsUtils {
             return;
         };
 
-        if let Some(active_constraints) = self.window_size_constraints.lock().get_mut(window_index)
-        {
-            *active_constraints = constraints;
+        let Ok(mut window_size_constraints) = self.window_size_constraints.try_borrow_mut() else {
+            log!("[ERROR] Window size constraints is locked, cannot access as mutable!");
+            return;
+        };
+
+        if let Some(active_constraints) = window_size_constraints.get_mut(window_index) {
+            *active_constraints = Arc::new(constraints);
         }
     }
 
@@ -1076,7 +1094,7 @@ impl CustomWindowsUtils {
                 },
             );
             log!(
-                "Texture Loader: Scheduled \"",
+                "[Texture Loader] Scheduled \"",
                 full_image_path,
                 "\" for upload to the GPU!"
             );
