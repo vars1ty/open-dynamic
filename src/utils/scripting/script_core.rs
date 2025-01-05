@@ -13,6 +13,7 @@ use rune::{
     termcolor::{ColorChoice, StandardStream},
     *,
 };
+use runtime::SyncFunction;
 use std::{error::Error, ffi::CString, sync::Arc};
 use zstring::ZString;
 
@@ -58,6 +59,25 @@ impl MutexValue {
     }
 }
 
+/// Information about a frame update callback.
+pub struct FrameUpdateCallback {
+    /// Callback function.
+    callback: SyncFunction,
+
+    /// Optional parameter to pass into `callback`.
+    opt_param: Option<Value>,
+}
+
+impl FrameUpdateCallback {
+    /// Builds a new instance of `FrameUpdateCallback`.
+    pub fn new(callback: SyncFunction, opt_param: Option<Value>) -> Self {
+        Self {
+            callback,
+            opt_param,
+        }
+    }
+}
+
 /// Structure that implements Send and Sync so that the `Vm` inside of it can be used for
 /// `compiled_scripts`.
 /// It is **not** recommended to send the VM instance across threads, instead use `SyncFunction` if
@@ -85,6 +105,9 @@ pub struct ScriptCore {
 
     /// Global Script Variables.
     global_script_variables: Arc<DashMap<String, ValueWrapper>>,
+
+    /// Frame update callbacks. Each function is called every new frame, once for each window.
+    on_frame_update_callbacks: Arc<DashMap<String, FrameUpdateCallback>>,
 }
 
 thread_safe_structs!(ScriptCore);
@@ -101,6 +124,7 @@ impl ScriptCore {
                 "//# DisableCompilerOption: CLIDiagnostics",
             ],
             global_script_variables: Default::default(),
+            on_frame_update_callbacks: Default::default(),
         }
     }
 
@@ -124,7 +148,6 @@ impl ScriptCore {
             Arc::clone(&base_core),
             base_core_reader.get_crosscom(),
             base_core_reader.get_config().get_product_serials(),
-            Arc::clone(&self.global_script_variables),
         )? {
             context.install(module)?;
         }
@@ -138,6 +161,7 @@ impl ScriptCore {
         }
 
         context.install(UIModules::build(
+            Arc::clone(&base_core),
             base_core_reader.get_custom_window_utils(),
         )?)?;
         drop(base_core_reader);
@@ -383,6 +407,10 @@ impl ScriptCore {
             });
         }
 
+        if let Ok(data_bool) = data.as_bool().into_result() {
+            return Some(data_bool as u8 as *const i64);
+        }
+
         let Ok(data_string) = data.to_owned().into_string().into_result() else {
             return None;
         };
@@ -393,5 +421,60 @@ impl ScriptCore {
 
         let cstr = CString::new(data_string.to_owned()).ok()?;
         Some(cstr.into_raw() as *const i64)
+    }
+
+    /// Adds a new `on_frame_update` callback to `self.on_frame_update`. If there is already a
+    /// callback defined as `identifier`, then it's replaced.
+    pub fn register_frame_update_callback(
+        &self,
+        identifier: String,
+        callback: SyncFunction,
+        opt_param: Option<Value>,
+    ) {
+        self.on_frame_update_callbacks
+            .insert(identifier, FrameUpdateCallback::new(callback, opt_param));
+    }
+
+    /// Removes the defined callback if present.
+    pub fn remove_frame_update_callback(&self, identifier: &str) {
+        self.on_frame_update_callbacks.remove(identifier);
+    }
+
+    /// Calls all callbacks and passes in `window` and `ui`.
+    /// If `window` and/or `ui` are `None`, then the callback was issued outside of a window.
+    pub fn call_frame_update_callbacks(
+        &self,
+        window: Option<&str>,
+        ui: Option<&hudhook::imgui::Ui>,
+    ) {
+        if self.on_frame_update_callbacks.is_empty() {
+            return;
+        }
+
+        let ui_ptr = ui.map(|ui| std::ptr::addr_of!(ui) as i64);
+        for entry in &*self.on_frame_update_callbacks {
+            let frame_update_callback_data = entry.value();
+            if let Err(error) = frame_update_callback_data
+                .callback
+                .call::<(Option<&Value>, Option<&str>, Option<i64>), ()>((
+                    frame_update_callback_data.opt_param.as_ref(),
+                    window,
+                    ui_ptr,
+                ))
+                .into_result()
+            {
+                log!(
+                    "[ERROR] Failed calling frame update callback on \"",
+                    entry.key(),
+                    "\", error: ",
+                    error
+                );
+            }
+        }
+    }
+
+    /// Returns `self.global_script_variables`.
+    pub fn get_global_script_variables(&self) -> Arc<DashMap<String, ValueWrapper>> {
+        Arc::clone(&self.global_script_variables)
     }
 }

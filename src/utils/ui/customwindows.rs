@@ -9,7 +9,7 @@ use atomic_refcell::AtomicRefCell;
 use dashmap::DashMap;
 use hudhook::imgui::{self, Condition, StyleColor, TextureId, TreeNodeFlags};
 use indexmap::IndexMap;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use rune::{alloc::clone::TryClone, runtime::SyncFunction, Value};
 use std::collections::HashMap;
 use std::{cell::Cell, rc::Rc, sync::atomic::Ordering, sync::Arc};
@@ -51,7 +51,7 @@ pub struct CustomWindowsUtils {
     window_size_constraints: AtomicRefCell<Vec<Arc<[f32; 4]>>>,
 
     /// Cached GPU TextureIds, key being the path to the image.
-    cached_images: RwLock<HashMap<String, CustomTexture>>,
+    cached_images: AtomicRefCell<HashMap<String, CustomTexture>>,
 
     /// Current cursor point.
     /// Allowed to be non-thread-safe as it doesn't matter.
@@ -69,7 +69,7 @@ pub struct CustomWindowsUtils {
     /// can cause deadlocks.
     /// No `*Map` because it requires traits which aren't implemented for `*Function` in order to
     /// add entries.
-    pending_callbacks: Mutex<Vec<(Rc<SyncFunction>, CallbackType)>>,
+    pending_callbacks: AtomicRefCell<Vec<(Rc<SyncFunction>, CallbackType)>>,
 
     /// UI Color Presets for each window.
     window_color_presets: DashMap<String, String>,
@@ -84,6 +84,7 @@ impl CustomWindowsUtils {
             return;
         };
 
+        let script_core = base_core_reader.get_script_core();
         let config = base_core_reader.get_config();
         drop(base_core_reader);
 
@@ -117,7 +118,7 @@ impl CustomWindowsUtils {
             drop(window_size_constraints);
 
             let default_style = self.activate_color_preset_for_window(custom_window, config);
-            ui.window(&**custom_window)
+            ui.window(custom_window)
                 .size(DEFAULT_SIZE, Condition::FirstUseEver)
                 .size_constraints(
                     [size_constraints[0], size_constraints[1]],
@@ -126,6 +127,7 @@ impl CustomWindowsUtils {
                 .collapsed(true, Condition::Once)
                 .build(|| {
                     self.draw_custom_window(Arc::clone(&base_core), &widgets, ui);
+                    script_core.call_frame_update_callbacks(Some(custom_window), Some(ui));
                     ImGuiUtils::render_software_cursor(ui, &mut self.point.get());
                 });
 
@@ -204,7 +206,7 @@ impl CustomWindowsUtils {
             .into_result()
         {
             log!(
-                "[ERROR] Failed calling",
+                "[ERROR] Failed calling ",
                 widget_string_type,
                 " function on \"",
                 identifier,
@@ -216,8 +218,8 @@ impl CustomWindowsUtils {
 
     /// Calls all pending callbacks.
     fn call_pending_callbacks(&self) {
-        let Some(mut pending_callbacks) = self.pending_callbacks.try_lock() else {
-            log!("[ERROR] Pending callbacks is locked and cannot be accessed!");
+        let Ok(mut pending_callbacks) = self.pending_callbacks.try_borrow_mut() else {
+            log!("[ERROR] Pending callbacks is in use and cannot be accessed!");
             return;
         };
 
@@ -539,8 +541,8 @@ impl CustomWindowsUtils {
         callback: &Rc<SyncFunction>,
         callback_type: CallbackType,
     ) {
-        let Some(mut pending_callbacks) = self.pending_callbacks.try_lock() else {
-            log!("[ERROR] Pending callbacks is locked and cannot be accessed!");
+        let Ok(mut pending_callbacks) = self.pending_callbacks.try_borrow_mut() else {
+            log!("[ERROR] Pending callbacks is in use and cannot be accessed!");
             return;
         };
 
@@ -1045,8 +1047,8 @@ impl CustomWindowsUtils {
 
     /// Clears all cached images.
     pub fn clear_cached_images(&self) {
-        let Some(mut cached_textures) = self.cached_images.try_write() else {
-            log!("[ERROR] Cached textures is locked, cannot clear!");
+        let Ok(mut cached_textures) = self.cached_images.try_borrow_mut() else {
+            log!("[ERROR] Cached textures is in use, cannot clear!");
             return;
         };
 
@@ -1072,7 +1074,7 @@ impl CustomWindowsUtils {
 
         // Do NOT add GifFrames, that's not up to this function.
         if texture_type == CustomTextureType::GifFrame {
-            return if let Some(cached_textures) = self.cached_images.try_read() {
+            return if let Ok(cached_textures) = self.cached_images.try_borrow() {
                 cached_textures.get(&full_image_path.data)?.texture_id
             } else {
                 log!("[ERROR] Cached textures is locked, cannot get TextureId!");
@@ -1080,8 +1082,8 @@ impl CustomWindowsUtils {
             };
         }
 
-        let Some(mut cached_textures) = self.cached_images.try_write() else {
-            log!("[ERROR] Cached textures is locked, cannot insert new request for TextureId lookup!");
+        let Ok(mut cached_textures) = self.cached_images.try_borrow_mut() else {
+            log!("[ERROR] Cached textures is in use, cannot insert new request for TextureId lookup!");
             return None;
         };
 
@@ -1161,7 +1163,7 @@ impl CustomWindowsUtils {
     }
 
     /// Gets the value of `self.cached_images`.
-    pub const fn get_cached_images(&self) -> &RwLock<HashMap<String, CustomTexture>> {
+    pub const fn get_cached_images(&self) -> &AtomicRefCell<HashMap<String, CustomTexture>> {
         &self.cached_images
     }
 }

@@ -44,9 +44,9 @@ impl SystemModules {
         base_core: Arc<RwLock<BaseCore>>,
         crosscom: Arc<RwLock<CrossCom>>,
         serials: Arc<Vec<String>>,
-        global_script_variables: Arc<DashMap<String, ValueWrapper>>,
     ) -> Result<Vec<Module>, ContextError> {
         let base_core_reader = base_core.read();
+        let script_core = base_core_reader.get_script_core();
         let config = base_core_reader.get_config();
         drop(base_core_reader);
 
@@ -77,6 +77,24 @@ impl SystemModules {
         module
             .function("is_locked", MutexValue::is_locked)
             .build_associated::<MutexValue>()?;
+
+        module
+            .function("read", |ptr: i64| Self::read_primitive(ptr))
+            .build_associated::<i64>()?;
+        module
+            .function("read_offset", |ptr: i64, offset: i64| {
+                Self::read_primitive(ptr + offset)
+            })
+            .build_associated::<i64>()?;
+
+        module
+            .function("write", |ptr: i64, value: Value| Self::write(ptr, value))
+            .build_associated::<i64>()?;
+        module
+            .function("write_offset", |ptr: i64, offset: i64, value: Value| {
+                Self::write(ptr + offset, value)
+            })
+            .build_associated::<i64>()?;
 
         dynamic_module
             .function("log", |data: &str| {
@@ -112,16 +130,7 @@ impl SystemModules {
             .function("hex_to_primitive", WinUtils::hex_to_primitive)
             .build()?;
         math_module
-            .function("sin", |value: f32| value.sin())
-            .build()?;
-        math_module
-            .function("cos", |value: f32| value.cos())
-            .build()?;
-        math_module
             .function("pi", || std::f32::consts::PI)
-            .build()?;
-        math_module
-            .function("to_radians", |value: f32| value.to_radians())
             .build()?;
         windows_module
             .function("get_cursor_xy", Self::get_cursor_xy)
@@ -290,21 +299,19 @@ impl SystemModules {
         std_module.function("ltof", |l: i64| l as f32).build()?;
         std_module.function("ltod", |l: i64| l as f64).build()?;
 
-        let global_script_variables_clone = Arc::clone(&global_script_variables);
         std_module
             .function("define_global", move |variable_name, value| {
                 Self::define_global(
                     variable_name,
                     value,
-                    Arc::clone(&global_script_variables_clone),
+                    script_core.get_global_script_variables(),
                 )
             })
             .build()?;
 
-        let global_script_variables_clone = Arc::clone(&global_script_variables);
         std_module
             .function("get_global", move |variable_name| {
-                Self::get_global(variable_name, Arc::clone(&global_script_variables_clone))
+                Self::get_global(variable_name, script_core.get_global_script_variables())
             })
             .build()?;
 
@@ -610,7 +617,14 @@ pub struct UIModules;
 impl UIModules {
     /// Builds this module.
     #[optimize(size)]
-    pub fn build(custom_window_utils: &'static CustomWindowsUtils) -> Result<Module, ContextError> {
+    pub fn build(
+        base_core: Arc<RwLock<BaseCore>>,
+        custom_window_utils: &'static CustomWindowsUtils,
+    ) -> Result<Module, ContextError> {
+        let base_core_reader = base_core.read();
+        let script_core = base_core_reader.get_script_core();
+        drop(base_core_reader);
+
         let mut module = Module::with_crate(&zencstr!("ui").data)?; // <-- TODO: Rename to `UI`.
 
         module
@@ -686,7 +700,7 @@ impl UIModules {
                         identifier.to_owned(),
                         WidgetType::Button(
                             ZString::new(text),
-                            Self::function_into_sync(function, identifier),
+                            Self::function_into_rc_sync(function, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -729,7 +743,7 @@ impl UIModules {
                             min,
                             max,
                             default_value,
-                            Self::function_into_sync(function, identifier),
+                            Self::function_into_rc_sync(function, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -753,7 +767,7 @@ impl UIModules {
                             min,
                             max,
                             default_value,
-                            Self::function_into_sync(function, identifier),
+                            Self::function_into_rc_sync(function, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -824,7 +838,7 @@ impl UIModules {
                             height,
                             false,
                             false,
-                            Self::function_into_sync(callback, identifier),
+                            Self::function_into_rc_sync(callback, identifier),
                             Rc::new(opt_param),
                             false,
                         ),
@@ -850,7 +864,7 @@ impl UIModules {
                             height,
                             true,
                             false,
-                            Self::function_into_sync(callback, identifier),
+                            Self::function_into_rc_sync(callback, identifier),
                             Rc::new(opt_param),
                             false,
                         ),
@@ -872,7 +886,7 @@ impl UIModules {
                             height,
                             false,
                             true,
-                            Self::function_into_sync(Function::new(|| {}), identifier),
+                            Self::function_into_rc_sync(Function::new(|| {}), identifier),
                             Rc::new(None),
                             false,
                         ),
@@ -934,7 +948,7 @@ impl UIModules {
                             String::default(),
                             width,
                             height,
-                            Self::function_into_sync(callback, identifier),
+                            Self::function_into_rc_sync(callback, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -1007,7 +1021,7 @@ impl UIModules {
                         WidgetType::Checkbox(
                             ZString::new(text),
                             checked,
-                            Self::function_into_sync(on_value_changed, identifier),
+                            Self::function_into_rc_sync(on_value_changed, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -1030,7 +1044,7 @@ impl UIModules {
                             ZString::new(text),
                             selected_index,
                             items,
-                            Self::function_into_sync(on_value_changed, identifier),
+                            Self::function_into_rc_sync(on_value_changed, identifier),
                             Rc::new(opt_param),
                         ),
                     )
@@ -1043,17 +1057,39 @@ impl UIModules {
                 custom_window_utils.set_color_preset_for(window_name, preset)
             })
             .build()?;
+        module
+            .function(
+                "register_frame_update_callback",
+                |identifier: String, callback, opt_param| {
+                    script_core.register_frame_update_callback(
+                        identifier.to_owned(),
+                        Self::function_into_sync(callback, identifier),
+                        opt_param,
+                    );
+                },
+            )
+            .build()?;
+        module
+            .function("remove_frame_update_callback", |identifier: &str| {
+                script_core.remove_frame_update_callback(identifier);
+            })
+            .build()?;
 
         Ok(module)
     }
 
-    /// Turns `Function` into a `Rc<SyncFunction>`, crashing if it fails.
-    fn function_into_sync(function: Function, identifier: String) -> Rc<SyncFunction> {
-        Rc::new(function.into_sync().into_result().dynamic_expect(zencstr!(
+    /// Turns `Function` into a `SyncFunction`, crashing if it fails.
+    fn function_into_sync(function: Function, identifier: String) -> SyncFunction {
+        function.into_sync().into_result().dynamic_expect(zencstr!(
             "Failed turning Function into SyncFunction at \"",
             identifier,
             "\""
-        )))
+        ))
+    }
+
+    /// Turns `Function` into a `Rc<SyncFunction>`, crashing if it fails.
+    fn function_into_rc_sync(function: Function, identifier: String) -> Rc<SyncFunction> {
+        Rc::new(Self::function_into_sync(function, identifier))
     }
 
     /// Helper function for making it easier to add sub-widgets.
@@ -1071,7 +1107,7 @@ impl UIModules {
             WidgetType::SubWidget(
                 sub_widget_type,
                 Default::default(),
-                Self::function_into_sync(call_once, section_identifier),
+                Self::function_into_rc_sync(call_once, section_identifier),
                 Rc::new(opt_param),
             ),
         )

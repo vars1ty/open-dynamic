@@ -78,7 +78,7 @@ impl DX11UI {
             code_editor_input: String::default(),
             script_name: String::with_capacity(24),
             community_window: OnceLock::new(),
-            point: POINT { x: 0, y: 0 },
+            point: POINT::default(),
             display_ui: true,
             can_toggle_ui: true,
             crosscom_channel,
@@ -162,10 +162,18 @@ impl DX11UI {
             return;
         };
 
-        let Some(mut cached_textures) = cached_images.try_write() else {
-            log!("[ERROR] Cached textures is locked, cannot load uninitialized textures!");
+        let Ok(mut cached_textures) = cached_images.try_borrow_mut() else {
+            log!("[ERROR] Cached textures is in use, cannot load uninitialized textures!");
             return;
         };
+
+        if cached_textures.is_empty() {
+            if !self.invalid_textures.is_empty() {
+                self.invalid_textures.clear();
+            }
+
+            return;
+        }
 
         // Only get the uninitialized textures.
         let uninitialized_textures = cached_textures.iter_mut().filter(|entry| {
@@ -180,7 +188,7 @@ impl DX11UI {
 
             match texture_type {
                 CustomTextureType::Gif => {
-                    log!("[Texture Loader]: Attempting to load GIF texture...");
+                    log!("[Texture Loader] Attempting to load GIF texture...");
 
                     // Save path for after this for-loop, as otherwise we risk deadlocks due to
                     // held-on resources.
@@ -276,7 +284,7 @@ impl DX11UI {
 
             let frame_path = ozencstr!(image_path, ".frame_", i);
             log!(
-                "[Texture Loader]: Loaded frame ",
+                "[Texture Loader] Loaded frame ",
                 i,
                 ", ready at in-memory path: ",
                 frame_path
@@ -291,7 +299,7 @@ impl DX11UI {
         }
 
         log!(
-            "[Texture Loader]: GIF frames loaded from \"",
+            "[Texture Loader] GIF frames loaded from \"",
             image_path,
             "\", frames: ",
             extracted_frames.len(),
@@ -360,14 +368,13 @@ impl ImguiRenderLoop for DX11UI {
     /// Renders the UI.
     fn render(&mut self, ui: &mut imgui::Ui, _render_context: &mut dyn RenderContext) {
         DELTA_TIME.store(ui.io().delta_time, Ordering::SeqCst);
-        self.load_unitialized_textures(_render_context);
-        ImGuiUtils::sync_clipboard(ui);
 
         let base_core = Arc::clone(&self.base_core);
         let Some(base_core_reader) = base_core.try_read() else {
             return;
         };
 
+        let script_core = base_core_reader.get_script_core();
         let config = base_core_reader.get_config();
         let imgui_utils = base_core_reader.get_imgui_utils();
         let Some(imgui_utils_reader) = imgui_utils.try_read() else {
@@ -383,20 +390,23 @@ impl ImguiRenderLoop for DX11UI {
         }
 
         IS_CURSOR_IN_UI.store(ui.io().want_capture_mouse, Ordering::Relaxed);
+        self.load_unitialized_textures(_render_context);
+        ImGuiUtils::sync_clipboard(ui);
+
         base_core_reader
             .get_custom_window_utils()
             .draw_custom_windows(ui, Arc::clone(&self.base_core));
 
+        script_core.call_frame_update_callbacks(None, None);
         ui.window(zencstr!("󰅩 Code Editor"))
             .size([300.0, 110.0], Condition::FirstUseEver)
             .collapsed(true, Condition::Once)
             .build(|| {
                 let available_size = ui.content_region_avail();
-                static FREE_SPACE_FOR_BUTTON: f32 = 25.0;
                 ui.input_text_multiline(
                     " ",
                     &mut self.code_editor_input,
-                    [available_size[0], available_size[1] - FREE_SPACE_FOR_BUTTON],
+                    [available_size[0], available_size[1] - 25.0],
                 )
                 .build();
                 if button!(ui, "󱐋 Execute") {
@@ -442,7 +452,7 @@ impl ImguiRenderLoop for DX11UI {
                     drop(imgui_utils_writer);
                     ui.separator();
 
-                    if ui.button(zencstr!("󱘖 Join Channel")) {
+                    if button!(ui, "󱘖 Join Channel") {
                         self.base_core
                             .try_read()
                             .unwrap_or_crash(zencstr!(
