@@ -96,6 +96,19 @@ impl SystemModules {
             })
             .build_associated::<i64>()?;
 
+        module
+            .function("sqrt", |value: f32| value.sqrt())
+            .build_associated::<f32>()?;
+        module
+            .function("round", |value: f64| value.round())
+            .build_associated::<f64>()?;
+        module
+            .function("sin_cos", |value: f32| value.sin_cos())
+            .build_associated::<f32>()?;
+        module
+            .function("sin_cos", |value: f64| value.sin_cos())
+            .build_associated::<f64>()?;
+
         dynamic_module
             .function("log", |data: &str| {
                 log!(data);

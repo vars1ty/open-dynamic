@@ -304,6 +304,7 @@ impl WinUtils {
             "F12" => 0x7B,
             "Space" => 0x20,
             "Control" => 0x11,
+            "Alt" => 0x12,
             "Left" => 0x25,
             "Right" => 0x27,
             "Up" => 0x26,

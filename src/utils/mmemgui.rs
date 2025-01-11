@@ -1,5 +1,7 @@
 use std::ffi::CStr;
 
+use hudhook::imgui::TextureId;
+
 use crate::utils::colorutils::ColorUtils;
 
 /// Exposed ImGui functions for use from memory function calling.
@@ -128,5 +130,36 @@ impl MemGui {
         let result = unsafe { hudhook::imgui::sys::igButton(text as _, size.into()) };
         text_color.pop();
         result
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ui_add_image(
+        ui: &UI,
+        surface_type: u8,
+        texture_id: usize,
+        min_x: i32,
+        min_y: i32,
+        max_x: i32,
+        max_y: i32,
+    ) {
+        let texture_id = TextureId::new(texture_id);
+        let min = [min_x as f32, min_y as f32];
+        let max = [max_x as f32, max_y as f32];
+
+        const WINDOW_LIST: u8 = 0;
+        const BACKGROUND_LIST: u8 = 1;
+        const FOREGROUND_LIST: u8 = 2;
+
+        match surface_type {
+            WINDOW_LIST => ui.get_window_draw_list().add_image(texture_id, min, max).build(),
+            BACKGROUND_LIST => ui.get_background_draw_list().add_image(texture_id, min, max).build(),
+            FOREGROUND_LIST => ui.get_foreground_draw_list().add_image(texture_id, min, max).build(),
+            _ => crash!("[ERROR] Tried calling ui_add_image with surface_type ", surface_type, ". Only 0 [WINDOW_LIST], 1 [BACKGROUND_LIST] and 2 [FOREGROUND_LIST] are supported!"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn ui_same_line(ui: &UI) {
+        ui.same_line();
     }
 }
