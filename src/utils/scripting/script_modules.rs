@@ -105,9 +105,6 @@ impl SystemModules {
         module
             .function("sin_cos", |value: f32| value.sin_cos())
             .build_associated::<f32>()?;
-        module
-            .function("sin_cos", |value: f64| value.sin_cos())
-            .build_associated::<f64>()?;
 
         dynamic_module
             .function("log", |data: &str| {
@@ -647,12 +644,6 @@ impl UIModules {
         module
             .function("remove_window", |name| {
                 custom_window_utils.remove_window(name)
-            })
-            .build()?;
-
-        module
-            .function("rename_window", |from_name, to_name| {
-                custom_window_utils.rename_window(from_name, to_name)
             })
             .build()?;
 

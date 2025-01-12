@@ -1,5 +1,6 @@
 use super::scripting::script_core::ValueWrapper;
 use crate::utils::extensions::{OptionExt, ResultExtensions};
+use atomic_refcell::AtomicRefCell;
 use parking_lot::{Once, RwLock};
 use retour::RawDetour;
 use rune::{
@@ -12,7 +13,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 pub static COLLECT_PARAMS_COUNT: AtomicUsize = const { AtomicUsize::new(10) };
 
 /// All Rune detours, acquired and non-acquired.
-static RUNE_DETOURS: RwLock<Vec<Arc<RwLock<RDetour>>>> = const { RwLock::new(Vec::new()) };
+static RUNE_DETOURS: RwLock<Vec<Arc<AtomicRefCell<RDetour>>>> = const { RwLock::new(Vec::new()) };
 
 /// Generates code for the unique ID tied to the calling function, and collects 10 arguments from
 /// `args` into `args_out`.
@@ -107,8 +108,8 @@ impl RDetour {
 
         if rune_detours.iter().any(|rdetour| {
             rdetour
-                .try_read()
-                .unwrap_or_crash(zencstr!(
+                .try_borrow()
+                .dynamic_expect(zencstr!(
                     "[ERROR] RDetour is locked, cannot safely add ID ",
                     detour_id,
                     "!"
@@ -125,7 +126,7 @@ impl RDetour {
 
         rune_detours.insert(
             detour_id as usize,
-            Arc::new(RwLock::new(Self {
+            Arc::new(AtomicRefCell::new(Self {
                 detour_id,
                 ..Default::default()
             })),
@@ -151,15 +152,15 @@ impl RDetour {
         };
 
         available_detour
-            .try_write()
-            .unwrap_or_crash(zencstr!(
+            .try_borrow_mut()
+            .dynamic_expect(zencstr!(
                 "[ERROR] The found RDetour is locked and cannot be modified!"
             ))
             .install_detour(from_ptr, rune_function, opt_param);
     }
 
     /// Finds the first-available `RDetour` and returns it.
-    fn find_free_detour() -> Option<Arc<RwLock<Self>>> {
+    fn find_free_detour() -> Option<Arc<AtomicRefCell<Self>>> {
         let Some(rune_detours) = RUNE_DETOURS.try_read() else {
             log!("[ERROR] rune_detours is locked, cannot find free detours!");
             return None;
@@ -168,7 +169,7 @@ impl RDetour {
         Some(Arc::clone(
             rune_detours
                 .iter()
-                .find(|rdetour| !rdetour.read().is_detour_acquired())?,
+                .find(|rdetour| !rdetour.borrow().is_detour_acquired())?,
         ))
     }
 
@@ -226,12 +227,12 @@ impl RDetour {
 
         let Some(rdetour) = rune_detours
             .iter()
-            .find(|rdetour| rdetour.read().get_detour_id() == detour_id)
+            .find(|rdetour| rdetour.borrow().get_detour_id() == detour_id)
         else {
             return 0;
         };
 
-        let Some(rdetour) = rdetour.try_read() else {
+        let Ok(rdetour) = rdetour.try_borrow() else {
             log!(
                 "[ERROR] RDetour at ID ",
                 detour_id,
@@ -273,28 +274,31 @@ impl RDetour {
     /// Determines the `detour_holder_xx` function based on `self.get_detour_id()` and returns it
     /// as a pointer.
     fn determine_detour_holder(&self) -> *const () {
-        match self.get_detour_id() {
-            0 => detour_holder_00 as *const (),
-            1 => detour_holder_01 as *const (),
-            2 => detour_holder_02 as *const (),
-            3 => detour_holder_03 as *const (),
-            4 => detour_holder_04 as *const (),
-            5 => detour_holder_05 as *const (),
-            6 => detour_holder_06 as *const (),
-            7 => detour_holder_07 as *const (),
-            8 => detour_holder_08 as *const (),
-            9 => detour_holder_09 as *const (),
-            10 => detour_holder_10 as *const (),
-            11 => detour_holder_11 as *const (),
-            12 => detour_holder_12 as *const (),
-            13 => detour_holder_13 as *const (),
-            14 => detour_holder_14 as *const (),
-            _ => crash!(
+        const HOLDERS: [*const (); 15] = [
+            detour_holder_00 as *const (),
+            detour_holder_01 as *const (),
+            detour_holder_02 as *const (),
+            detour_holder_03 as *const (),
+            detour_holder_04 as *const (),
+            detour_holder_05 as *const (),
+            detour_holder_06 as *const (),
+            detour_holder_07 as *const (),
+            detour_holder_08 as *const (),
+            detour_holder_09 as *const (),
+            detour_holder_10 as *const (),
+            detour_holder_11 as *const (),
+            detour_holder_12 as *const (),
+            detour_holder_13 as *const (),
+            detour_holder_14 as *const (),
+        ];
+
+        *HOLDERS
+            .get(self.get_detour_id() as usize)
+            .unwrap_or_crash(zencstr!(
                 "[ERROR] RDetour at ID ",
                 self.get_detour_id(),
                 " doesn't have any reserved function for it!"
-            ),
-        }
+            ))
     }
 
     /// Creates a new hook from a pointer, to another.
@@ -318,8 +322,8 @@ impl RDetour {
 
         let Some(rdetour) = rune_detours.iter().find(|rdetour| {
             rdetour
-                .try_read()
-                .unwrap_or_crash(zencstr!(
+                .try_borrow()
+                .dynamic_expect(zencstr!(
                     "[ERROR] RDetour at address ",
                     format!("{address:?}"),
                     " is locked and cannot be modified!"
@@ -331,7 +335,7 @@ impl RDetour {
             return false;
         };
 
-        let Some(mut rdetour) = rdetour.try_write() else {
+        let Ok(mut rdetour) = rdetour.try_borrow_mut() else {
             log!(
                 "[ERROR] RDetour at ",
                 format!("{address:?}"),

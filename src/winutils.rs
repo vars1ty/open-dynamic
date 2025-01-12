@@ -62,8 +62,9 @@ impl WinUtils {
             }
 
             ZString::new(
-                String::from_utf8(buffer[..size as _].to_vec())
-                    .dynamic_expect(zencstr!("Failed to safely convert DLL path to a valid UTF-8 String")),
+                String::from_utf8(buffer[..size as _].to_vec()).dynamic_expect(zencstr!(
+                    "Failed to safely convert DLL path to a valid UTF-8 String"
+                )),
             )
         }
     }
@@ -211,7 +212,7 @@ impl WinUtils {
 
     /// Returns the cursor position within the foreground window.
     pub fn get_cursor_pos() -> POINT {
-        let mut point = POINT { x: 0, y: 0 };
+        let mut point = POINT::default();
         Self::get_cursor_pos_recycle(&mut point);
         point
     }
