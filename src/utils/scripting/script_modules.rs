@@ -116,7 +116,7 @@ impl SystemModules {
             .function("is_key_down", WinUtils::is_key_down)
             .build()?;
         dynamic_module
-            .function("get_delta_time", || DELTA_TIME.load(Ordering::SeqCst))
+            .function("get_delta_time", || DELTA_TIME.load(Ordering::Relaxed))
             .build()?;
         compiler_module
             .function("run_multi_threaded", Self::run_multi_threaded)
