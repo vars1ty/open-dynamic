@@ -314,7 +314,7 @@ impl RDetour {
             rdetour
                 .try_borrow()
                 .dynamic_expect(zencstr!(
-                    "[ERROR] RDetour at address ",
+                    "RDetour at address ",
                     format!("{address:?}"),
                     " is locked and cannot be modified!"
                 ))

@@ -385,6 +385,7 @@ impl ImguiRenderLoop for DX11UI {
         drop(imgui_utils_reader);
 
         self.on_toggle_ui();
+        script_core.call_frame_update_callbacks(None, None);
         if !self.display_ui {
             return;
         }
@@ -397,7 +398,6 @@ impl ImguiRenderLoop for DX11UI {
             .get_custom_window_utils()
             .draw_custom_windows(ui, Arc::clone(&self.base_core));
 
-        script_core.call_frame_update_callbacks(None, None);
         ui.window(zencstr!("󰅩 Code Editor"))
             .size([300.0, 110.0], Condition::FirstUseEver)
             .collapsed(true, Condition::Once)
