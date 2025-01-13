@@ -48,6 +48,25 @@ macro_rules! generate_detour_holder {
     };
 }
 
+/// All detour holder function pointers.
+const HOLDERS: [*const (); 15] = [
+    detour_holder_00 as *const (),
+    detour_holder_01 as *const (),
+    detour_holder_02 as *const (),
+    detour_holder_03 as *const (),
+    detour_holder_04 as *const (),
+    detour_holder_05 as *const (),
+    detour_holder_06 as *const (),
+    detour_holder_07 as *const (),
+    detour_holder_08 as *const (),
+    detour_holder_09 as *const (),
+    detour_holder_10 as *const (),
+    detour_holder_11 as *const (),
+    detour_holder_12 as *const (),
+    detour_holder_13 as *const (),
+    detour_holder_14 as *const (),
+];
+
 /// Holds the information about a Rune detour.
 #[derive(Default)]
 pub struct RDetour {
@@ -77,21 +96,11 @@ impl RDetour {
     /// Calls all `detour_holder_xx` functions in order for each one to register itself via `register_new_detour`.
     pub fn register_all_detours() {
         unsafe {
-            detour_holder_00();
-            detour_holder_01();
-            detour_holder_02();
-            detour_holder_03();
-            detour_holder_04();
-            detour_holder_05();
-            detour_holder_06();
-            detour_holder_07();
-            detour_holder_08();
-            detour_holder_09();
-            detour_holder_10();
-            detour_holder_11();
-            detour_holder_12();
-            detour_holder_13();
-            detour_holder_14();
+            for holder in HOLDERS {
+                // Safety: The function is transmuted to the same style as the generated one,
+                // making it safe to call.
+                std::mem::transmute::<*const (), unsafe extern "C" fn(...) -> *const i64>(holder)();
+            }
         }
 
         #[cfg(target_pointer_width = "32")]
@@ -110,9 +119,8 @@ impl RDetour {
             rdetour
                 .try_borrow()
                 .dynamic_expect(zencstr!(
-                    "[ERROR] RDetour is locked, cannot safely add ID ",
-                    detour_id,
-                    "!"
+                    "RDetour is locked, cannot safely add ID ",
+                    detour_id
                 ))
                 .get_detour_id()
                 == detour_id
@@ -154,7 +162,7 @@ impl RDetour {
         available_detour
             .try_borrow_mut()
             .dynamic_expect(zencstr!(
-                "[ERROR] The found RDetour is locked and cannot be modified!"
+                "The found RDetour is locked and cannot be modified"
             ))
             .install_detour(from_ptr, rune_function, opt_param);
     }
@@ -274,24 +282,6 @@ impl RDetour {
     /// Determines the `detour_holder_xx` function based on `self.get_detour_id()` and returns it
     /// as a pointer.
     fn determine_detour_holder(&self) -> *const () {
-        const HOLDERS: [*const (); 15] = [
-            detour_holder_00 as *const (),
-            detour_holder_01 as *const (),
-            detour_holder_02 as *const (),
-            detour_holder_03 as *const (),
-            detour_holder_04 as *const (),
-            detour_holder_05 as *const (),
-            detour_holder_06 as *const (),
-            detour_holder_07 as *const (),
-            detour_holder_08 as *const (),
-            detour_holder_09 as *const (),
-            detour_holder_10 as *const (),
-            detour_holder_11 as *const (),
-            detour_holder_12 as *const (),
-            detour_holder_13 as *const (),
-            detour_holder_14 as *const (),
-        ];
-
         *HOLDERS
             .get(self.get_detour_id() as usize)
             .unwrap_or_crash(zencstr!(

@@ -594,24 +594,20 @@ impl CustomWindowsUtils {
     }
 
     /// Adds a widget to the currently selected custom window.
-    pub fn add_widget(&self, window: &str, mut identifier: String, widget_type: WidgetType) {
+    pub fn add_widget(
+        &'static self,
+        window: &str,
+        mut identifier: String,
+        widget_type: WidgetType,
+    ) {
         if identifier.is_empty() {
             // Empty identifier, use a "random" string mixed with the pointer of identifier.
             identifier = StringUtils::get_random();
             identifier.push_str(&(identifier.as_ptr() as i64).to_string());
         }
 
-        let window_widgets = self.window_widgets.try_get_mut(window);
-        if window_widgets.is_locked() {
-            log!(
-                "[ERROR] Window widgets is locked, no widgets can be added to \"",
-                window,
-                "\"!"
-            );
-            return;
-        }
-
-        let Some(mut window_widgets) = window_widgets.try_unwrap() else {
+        let Some(mut window_widgets) = self.window_widgets.get_mut(window) else {
+            log!("[ERROR] No window defined as \"", window, "\" was found!");
             return;
         };
 
@@ -726,7 +722,11 @@ impl CustomWindowsUtils {
 
         // Iterate over sub-widgets and remove any potential matches.
         for (_, widget) in &*window_widgets {
-            if let WidgetType::SubWidget(_, widgets, ..) = &mut *widget.borrow_mut() {
+            let Ok(mut widget) = widget.try_borrow_mut() else {
+                continue;
+            };
+
+            if let WidgetType::SubWidget(_, widgets, ..) = &mut *widget {
                 widgets.shift_remove(&identifier);
             }
         }
