@@ -451,7 +451,12 @@ impl CrossCom {
             );
         }
 
-        if self.current_channel.borrow().eq_ignore_ascii_case(&channel)
+        let Ok(mut current_channel) = self.current_channel.try_borrow_mut() else {
+            log!("[ERROR] Current channel is already being used, cannot switch!");
+            return;
+        };
+
+        if current_channel.eq_ignore_ascii_case(&channel)
             || !channel.starts_with('#')
             || channel.contains(' ')
             || channel.len() < 4
@@ -459,11 +464,6 @@ impl CrossCom {
             log!("[ERROR] You are either already in the specified channel, or its invalid!");
             return;
         }
-
-        let Ok(mut current_channel) = self.current_channel.try_borrow_mut() else {
-            log!("[ERROR] Current channel is already being used, cannot switch!");
-            return;
-        };
 
         self.has_pending_channel_update
             .store(true, Ordering::Relaxed);
