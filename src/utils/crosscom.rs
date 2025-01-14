@@ -70,9 +70,10 @@ pub enum DataType {
     /// Requests the variables from the server.
     RequestVariables,
 
-    /// Requests all of the server variables if specified as `None`.
+    #[deprecated = "No longer actively used, soon to be removed."]
     ReceiveVariables(HashMap<String, String>),
 
+    #[deprecated = "No longer actively used, soon to be removed."]
     UpdateVariables(HashMap<String, String>),
 
     /// Requests the community content from the server if specified as `None`.
