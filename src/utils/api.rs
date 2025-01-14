@@ -38,7 +38,7 @@ impl API {
         .use_string(|data| {
             // Update this once the version changes, since using env!() doesn't inline the version for
             // it to be encrypted.
-            if zencstr!("7.0.0-release") != zencstr!(data) {
+            if zencstr!("7.1.0-release") != zencstr!(data) {
                 crash!("[ERROR] Invalid version, switch to ", data)
             }
 
