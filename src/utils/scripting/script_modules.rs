@@ -105,6 +105,16 @@ impl SystemModules {
         module
             .function("sin_cos", |value: f32| value.sin_cos())
             .build_associated::<f32>()?;
+        module
+            .function("lerp", |value: f32, to: f32, time: f32| {
+                value + time * (to - value)
+            })
+            .build_associated::<f32>()?;
+        module
+            .function("lerp", |value: f64, to: f64, time: f64| {
+                value + time * (to - value)
+            })
+            .build_associated::<f64>()?;
 
         dynamic_module
             .function("log", |data: &str| {
@@ -139,9 +149,12 @@ impl SystemModules {
         parse_module
             .function("hex_to_primitive", WinUtils::hex_to_primitive)
             .build()?;
+
+        // Deprecated: To be moved into f32/f64.
         math_module
             .function("pi", || std::f32::consts::PI)
             .build()?;
+
         windows_module
             .function("get_cursor_xy", Self::get_cursor_xy)
             .build()?;
@@ -196,12 +209,6 @@ impl SystemModules {
                 }
 
                 drop(unsafe { CString::from_raw(ptr as _) });
-            })
-            .build()?;
-
-        math_module
-            .function("lerp", |value: f32, to: f32, time: f32| {
-                value.lerp(to, time)
             })
             .build()?;
 
