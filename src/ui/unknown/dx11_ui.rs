@@ -367,7 +367,7 @@ impl ImguiRenderLoop for DX11UI {
 
     /// Renders the UI.
     fn render(&mut self, ui: &mut imgui::Ui, _render_context: &mut dyn RenderContext) {
-        DELTA_TIME.store(ui.io().delta_time, Ordering::SeqCst);
+        DELTA_TIME.store(ui.io().delta_time, Ordering::Relaxed);
 
         let base_core = Arc::clone(&self.base_core);
         let Some(base_core_reader) = base_core.try_read() else {
@@ -463,14 +463,14 @@ impl ImguiRenderLoop for DX11UI {
                             .unwrap_or_crash(zencstr!(
                                 "[ERROR] Failed reading CrossCom, cannot continue!"
                             ))
-                            .join_channel(&self.crosscom_channel);
+                            .join_channel(self.crosscom_channel.to_owned());
                     }
                 } else {
                     text_color.pop();
                 }
 
                 let text_color = ui.push_style_color(StyleColor::Text, [0.0, 0.0, 0.0, 1.0]);
-                if ui.collapsing_header(zencstr!("󰉼 Colors"), TreeNodeFlags::OPEN_ON_ARROW) {
+                if ui.collapsing_header(zencstr!("󰉼 Style"), TreeNodeFlags::OPEN_ON_ARROW) {
                     text_color.pop();
 
                     self.display_colors_warning(ui);

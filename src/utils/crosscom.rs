@@ -436,7 +436,7 @@ impl CrossCom {
     }
 
     /// Tries to join the specified channel.
-    pub fn join_channel(&self, channel: &str) {
+    pub fn join_channel(&self, mut channel: String) {
         if self.has_pending_channel_update.load(Ordering::Relaxed) {
             log!("[ERROR] You are already in the process of joining a channel, be patient!");
             return;
@@ -451,7 +451,7 @@ impl CrossCom {
             );
         }
 
-        if self.current_channel.borrow().eq_ignore_ascii_case(channel)
+        if self.current_channel.borrow().eq_ignore_ascii_case(&channel)
             || !channel.starts_with('#')
             || channel.contains(' ')
             || channel.len() < 4
@@ -460,18 +460,21 @@ impl CrossCom {
             return;
         }
 
+        let Ok(mut current_channel) = self.current_channel.try_borrow_mut() else {
+            log!("[ERROR] Current channel is already being used, cannot switch!");
+            return;
+        };
+
         self.has_pending_channel_update
             .store(true, Ordering::Relaxed);
 
         // Keep the channel string within a certain range of characters before applying it as the
         // new channel.
-        let mut channel = channel.to_owned();
         channel.truncate(64);
 
-        *self.current_channel.borrow_mut() = channel;
-        self.send_data_type(DataType::UpdateChannel(
-            self.current_channel.borrow().to_owned(),
-        ));
+        *current_channel = channel;
+        self.send_data_type(DataType::UpdateChannel(current_channel.to_owned()));
+        drop(current_channel);
 
         if self
             .get_network_listener()

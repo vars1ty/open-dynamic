@@ -66,7 +66,7 @@ pub struct DNXFunctions {
     server_get_current_channel: Box<dyn Fn() -> String + Send + Sync>,
 
     /// Attempts to join the specified channel.
-    server_join_channel: Box<dyn Fn(&str) + Send + Sync>,
+    server_join_channel: Box<dyn Fn(String) + Send + Sync>,
 
     /// Sends the specified content from your client, to the rest of the clients in the active
     /// party.
