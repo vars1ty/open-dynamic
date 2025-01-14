@@ -110,11 +110,6 @@ impl SystemModules {
                 value + time * (to - value)
             })
             .build_associated::<f32>()?;
-        module
-            .function("lerp", |value: f64, to: f64, time: f64| {
-                value + time * (to - value)
-            })
-            .build_associated::<f64>()?;
 
         dynamic_module
             .function("log", |data: &str| {
