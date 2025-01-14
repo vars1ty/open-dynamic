@@ -104,7 +104,10 @@ impl RDetour {
         }
 
         #[cfg(target_pointer_width = "32")]
-        log!("[WARN] RDetours ready, note that 32-bit is not stable with c_variadic-forced hooks!");
+        {
+            log!("[WARN] RDetours ready, note that 32-bit is not stable with c_variadic-forced hooks!");
+            log!("[WARN] Use plugins over RDetours if you need hooks for 32-bit!");
+        }
     }
 
     /// Registers a new detour at ID `detour_id - 1` in `RUNE_DETOURS`.
@@ -174,11 +177,17 @@ impl RDetour {
             return None;
         };
 
-        Some(Arc::clone(
-            rune_detours
-                .iter()
-                .find(|rdetour| !rdetour.borrow().is_detour_acquired())?,
-        ))
+        for rdetour in rune_detours.iter() {
+            let Ok(rdetour_borrow) = rdetour.try_borrow() else {
+                continue;
+            };
+
+            if !rdetour_borrow.is_detour_acquired() {
+                return Some(Arc::clone(rdetour));
+            }
+        }
+
+        None
     }
 
     /// Installs a detour from `from_ptr` into a freely-available detour holder function, which
@@ -214,6 +223,7 @@ impl RDetour {
                 );
                 return;
             }
+
             self.detour = Some(hook);
         }
 

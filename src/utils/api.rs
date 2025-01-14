@@ -17,7 +17,7 @@ impl API {
         log!("Validating version...");
 
         // Lock thread until a valid response has been received.
-        let version = loop {
+        loop {
             if let Some(message) = crosscom
                 .read()
                 .get_network_listener()
@@ -34,16 +34,18 @@ impl API {
                     _ => continue,
                 }
             }
-        };
-
-        // Update this once the version changes, since using env!() doesn't inline the version for
-        // it to be encrypted.
-        if zencstr!("7.0.0-release") != zencstr!(version.data) {
-            crash!("[ERROR] Invalid version, switch to ", version)
         }
+        .use_string(|data| {
+            // Update this once the version changes, since using env!() doesn't inline the version for
+            // it to be encrypted.
+            if zencstr!("7.0.0-release") != zencstr!(data) {
+                crash!("[ERROR] Invalid version, switch to ", data)
+            }
 
-        drop(version);
-        log!("Version validated!");
+            data.clear();
+            log!("Version validated!");
+        });
+
         crosscom
     }
 }
