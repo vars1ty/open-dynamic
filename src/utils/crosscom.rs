@@ -18,6 +18,8 @@ use std::{
     },
 };
 
+use super::extensions::ResultExtensions;
+
 /// CrossCom outgoing client data.
 #[derive(rkyv::Archive, rkyv::Serialize, Default)]
 pub struct CrossComClientData {
@@ -121,8 +123,6 @@ pub struct CrossCom {
     /// Client Username.
     username: &'static str,
 
-    startup_channel: String,
-
     /// Use the local server?
     use_local_server: bool,
 
@@ -164,10 +164,9 @@ impl CrossCom {
 
         Self {
             username,
-            startup_channel: channel.to_owned(),
             use_local_server,
             state: Cell::new(CrossComState::Disconnected),
-            current_channel: RefCell::new(channel.to_owned()),
+            current_channel: RefCell::new(channel),
             has_pending_channel_update: AtomicBool::default(),
             server_endpoint: OnceLock::new(),
             handler: OnceLock::new(),
@@ -230,7 +229,14 @@ impl CrossCom {
                         crash!("[ERROR] CrossCom is already connected!");
                     }
 
-                    self.send_data_type(DataType::Auth(self.get_startup_channel().to_owned()));
+                    self.send_data_type(DataType::Auth(
+                        self.get_current_channel()
+                            .try_borrow()
+                            .dynamic_expect(zencstr!(
+                                "CrossCom current channel is already being used"
+                            ))
+                            .to_owned(),
+                    ));
                 }
             },
         });
@@ -427,11 +433,6 @@ impl CrossCom {
         };
 
         log!("[ERROR] Failed sending channel message, error: ", error);
-    }
-
-    /// Returns the startup channel.
-    fn get_startup_channel(&self) -> &str {
-        &self.startup_channel
     }
 
     /// Tries to join the specified channel.
